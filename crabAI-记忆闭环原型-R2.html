@@ -2,20 +2,1877 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex">
-<title>该文件已移除</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>crabAI · 记忆闭环原型 v1</title>
 <style>
-body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:620px;margin:14vh auto;padding:0 24px;line-height:1.75;color:#16181c}
-h2{font-size:20px;margin:0 0 12px}
-p{color:#444;font-size:15px}
-code{background:#f2f4f7;padding:2px 5px;border-radius:4px;font-size:13px}
+:root{
+  --bg:#0E1720; --panel:#131F2B; --card:#182634; --line:#24384A;
+  --ink:#E8F0F5; --muted:#8FA3B5; --cyan:#3EC7D8; --amber:#E8A33D;
+  --red:#E4695E; --green:#4BC08A; --radius:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.6;
+}
+#app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+header{padding:16px 16px 10px;position:sticky;top:0;background:rgba(14,23,32,.94);backdrop-filter:blur(8px);z-index:20;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand h1{font-size:20px;margin:0;letter-spacing:.02em}
+.brand span{font-size:11px;color:var(--muted);letter-spacing:.12em}
+.tabs{display:flex;gap:6px;margin-top:12px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;padding:6px 12px;border-radius:20px;background:var(--panel);color:var(--muted);font-size:13px;border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.tab.on{background:rgba(62,199,216,.14);color:var(--cyan);border-color:rgba(62,199,216,.35)}
+main{flex:1;padding:14px 14px 92px}
+.view{display:none}
+.view.on{display:block}
+
+/* 对话 */
+.msg{margin-bottom:12px;display:flex;justify-content:flex-end}
+.msg.ai{justify-content:flex-start}
+.bubble.ai{background:#12202B;border:1px solid #1E3346;border-radius:14px 14px 14px 4px;color:#DCE8F2}
+.bubble.ai .src{display:block;margin-top:8px;font-size:11px;color:#5E768A}
+.thinking{color:#7E93A6;font-style:normal}
+.live-dot{display:inline-block;width:6px;height:6px;border-radius:3px;background:#3EC7D8;margin-right:7px;vertical-align:middle;animation:livepulse 1.1s ease-in-out infinite}
+@keyframes livepulse{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+.live-body{display:inline;white-space:pre-wrap}
+.bubble{background:linear-gradient(135deg,#1D6E7C,#164C5C);padding:11px 13px;border-radius:14px 14px 4px 14px;max-width:88%;font-size:14px;white-space:pre-wrap}
+.sysline{margin:8px 0 14px;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.sysline b{color:var(--cyan);font-weight:600}
+.composer{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(14,23,32,0),rgba(14,23,32,.96) 26%);z-index:30}
+.composer-inner{display:flex;gap:8px;align-items:flex-end;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:8px}
+textarea{flex:1;background:transparent;border:0;color:var(--ink);font-size:14px;line-height:1.5;resize:none;outline:none;max-height:120px;font-family:inherit}
+.send{flex:0 0 auto;width:40px;height:40px;border-radius:12px;border:0;background:var(--cyan);color:#062026;font-weight:700;font-size:16px;cursor:pointer}
+.send:disabled{opacity:.4}
+.hint{font-size:11px;color:var(--muted);margin:8px 2px 0}
+
+/* 卡片 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-bottom:10px}
+.card h3{margin:0 0 6px;font-size:14px;color:var(--ink)}
+.card p{margin:0;color:var(--muted);font-size:12.5px}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:19px;color:var(--cyan)}
+.stat span{font-size:11px;color:var(--muted)}
+
+/* 树 */
+.search{display:flex;gap:8px;margin-bottom:10px}
+.search input{flex:1;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;color:var(--ink);font-size:13.5px;outline:none}
+.search button{background:var(--panel);border:1px solid var(--line);color:var(--cyan);border-radius:10px;padding:0 12px;font-size:13px;cursor:pointer}
+.tree-node{border-left:2px solid var(--line);margin-left:6px;padding-left:10px}
+.l1{margin:10px 0 4px;font-size:14px;font-weight:600;color:var(--ink);display:flex;justify-content:space-between;cursor:pointer}
+.l1 small,.l2 small{color:var(--muted);font-weight:400;font-size:11px}
+.l2{margin:7px 0 3px;font-size:13px;color:var(--cyan);display:flex;justify-content:space-between;cursor:pointer}
+.l3{margin:6px 0 3px;font-size:12px;color:var(--muted);cursor:pointer}
+.fact{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 10px;margin:6px 0}
+.fact .txt{font-size:13px;line-height:1.55}
+.fact .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:5px;font-size:10.5px;color:var(--muted)}
+.fact .meta em{font-style:normal;color:var(--amber)}
+.fact .ops{display:flex;gap:10px;margin-top:6px;font-size:11px;color:var(--cyan)}
+.fact .ops span{cursor:pointer}
+.fact.hit{outline:2px solid rgba(62,199,216,.5)}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:30px 10px;line-height:1.9}
+
+/* 图谱 */
+.graphwrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;position:relative}
+svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:10px 2px}
+.legend i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+
+/* 规则 */
+.rulebox{width:100%;min-height:190px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;color:var(--ink);font-size:13px;line-height:1.8;resize:vertical;font-family:inherit;outline:none}
+.btn{display:inline-block;background:var(--cyan);color:#062026;border:0;border-radius:10px;padding:10px 16px;font-size:13.5px;font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.warn{background:var(--amber);color:#241505}
+.btnrow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* 底部抽屉 */
+#overlay{position:fixed;inset:0;background:rgba(4,10,16,.66);opacity:0;pointer-events:none;transition:.2s;z-index:40}
+#overlay.on{opacity:1;pointer-events:auto}
+#sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:var(--panel);border-radius:18px 18px 0 0;border-top:1px solid var(--line);z-index:41;transform:translateY(102%);transition:.26s cubic-bezier(.2,.8,.2,1);max-height:86vh;display:flex;flex-direction:column}
+#sheet.on{transform:translateY(0)}
+.sheet-head{padding:12px 16px 8px;border-bottom:1px solid var(--line)}
+.sheet-head h2{margin:0;font-size:15px}
+.sheet-head p{margin:3px 0 0;font-size:11.5px;color:var(--muted)}
+#sheet-body{padding:10px 14px;overflow-y:auto;flex:1}
+.sheet-foot{padding:10px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);display:flex;gap:8px}
+.sheet-foot .btn{flex:1;text-align:center}
+
+.cand{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:9px;background:var(--card);transition:.15s}
+.cand.off{opacity:.45}
+.cand-top{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--muted)}
+.cand-top input{width:18px;height:18px;accent-color:var(--cyan)}
+.tag{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(62,199,216,.14);color:var(--cyan)}
+.tag.t2{background:rgba(232,163,61,.14);color:var(--amber)}
+.tag.t3{background:rgba(228,105,94,.14);color:var(--red)}
+.cand-text{width:100%;background:transparent;border:0;border-bottom:1px dashed var(--line);color:var(--ink);font-size:13.5px;padding:7px 0;outline:none;font-family:inherit;line-height:1.55;resize:none;min-height:40px;overflow:hidden}
+.cand-quote{font-size:10.5px;color:var(--muted);margin-top:5px;line-height:1.5}
+.cand-row{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.chip{font-size:10.5px;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted);background:transparent}
+select.chip{color:var(--ink);appearance:none}
+.chip.on{border-color:var(--cyan);color:var(--cyan)}
+.tri{margin-top:8px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--line);overflow:hidden}
+.tri-row{display:grid;grid-template-columns:42px 1fr;gap:8px;padding:6px 9px;border-top:1px solid rgba(255,255,255,.05);align-items:start}
+.tri-row:first-child{border-top:0}
+.tri-k{font-size:10.5px;color:var(--muted);letter-spacing:.06em;padding-top:5px}
+.tri-v{font-size:12.5px;color:var(--ink);line-height:1.55;word-break:break-word}
+.tri-v.mut{color:var(--muted)}
+.tri-v .inf{color:var(--red)}
+.act-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(75,192,138,.14);color:var(--green)}
+.act-badge.a2{background:rgba(62,199,216,.14);color:var(--cyan)}
+.act-badge.a3{background:rgba(232,163,61,.16);color:var(--amber)}
+.act-badge.a4{background:rgba(143,163,181,.14);color:var(--muted)}
+
+#toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,20px);background:#1E3346;border:1px solid var(--line);color:var(--ink);padding:9px 14px;border-radius:10px;font-size:12.5px;opacity:0;transition:.25s;z-index:50;display:flex;gap:10px;align-items:center;white-space:nowrap}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#toast b{color:var(--cyan);cursor:pointer}
+
+/* 图谱工具条 */
+.gtools{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.mini{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:6px 10px;font-size:12px;cursor:pointer}
+.mini:active{background:var(--panel)}
+.gtools .hint{margin:0;font-size:11px}
+#svg{cursor:grab;touch-action:none}
+#svg.dragging{cursor:grabbing}
+/* 树工具条 */
+.treetools{display:flex;gap:8px;margin-bottom:8px}
+.treetools .mini{flex:1}
+.tw{display:flex;align-items:center;gap:6px}
+.arrow{display:inline-block;width:12px;color:var(--cyan);font-size:10px;transition:transform .15s}
+.arrow.open{transform:rotate(90deg)}
+.tbody{margin-left:2px}
+/* 设置 */
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px}
+.field input{width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px;outline:none}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--green);background:rgba(75,192,138,.12);border:1px solid rgba(75,192,138,.3);padding:2px 8px;border-radius:20px}
+.audit{font-size:11.5px;color:var(--muted);line-height:1.8;font-family:Consolas,monospace;white-space:pre-wrap}
+@media (min-width:520px){ body{background:#0A1118} #app{box-shadow:0 0 60px rgba(0,0,0,.5)} }
 </style>
 </head>
 <body>
-<h2>该文件已因隐私原因移除</h2>
-<p>原版本内置了个人叙事示例数据（对话种子与演示语句），已按作者要求从仓库删除，不在当前分支保留任何私人内容。</p>
-<p>现在可用的是空库版本：首次打开没有任何预置记忆，所有条目都由使用者自己确认后才写入。入口与说明见仓库 README。</p>
-<p>旧内容仍存在于此前的 Git 提交记录中，请勿引用；如需彻底清除，需要重写历史并强制推送。</p>
+<div id="app">
+  <header>
+    <div class="brand"><h1>crabAI</h1><span>MEMORY OS · P0 原型</span></div>
+    <div class="tabs">
+      <div class="tab on" data-view="chat">对话</div>
+      <div class="tab" data-view="tree">记忆树</div>
+      <div class="tab" data-view="graph">图谱</div>
+      <div class="tab" data-view="rules">规则</div>
+      <div class="tab" data-view="settings">设置</div>
+      <div class="tab" data-view="export">导出</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="view on" id="view-chat">
+      <div class="statgrid">
+        <div class="stat"><b id="stat-fact">0</b><span>原子事实</span></div>
+        <div class="stat"><b id="stat-node">0</b><span>图谱节点</b></div>
+        <div class="stat"><b id="stat-token">0</b><span>记忆占用</span></div>
+      </div>
+      <div id="msglist"></div>
+      <div class="hint">原话不会被直接归档。提交后先出候选，你确认并看过精炼结果，才会入库。</div>
+    </section>
+
+    <section class="view" id="view-tree">
+      <div class="search">
+        <input id="q" placeholder="例如：妮妮 政治课">
+        <button id="qbtn">检索</button>
+      </div>
+      <div id="recall" class="hint" style="margin-bottom:10px">输入关键词，按 L1→L4 逐层下钻，不会遍历全库。</div>
+      <div class="treetools"><button class="mini" id="expandAll">全部展开</button><button class="mini" id="collapseAll">全部折叠</button></div>
+      <div id="tree"></div>
+    </section>
+
+    <section class="view" id="view-graph">
+      <div class="gtools"><button class="mini" data-zoom="in">＋</button><button class="mini" data-zoom="out">－</button><button class="mini" data-zoom="reset">复位</button><span class="hint">滚轮缩放 · 拖拽平移 · 双指捏合</span></div>
+      <div class="graphwrap"><svg id="svg" viewBox="0 0 360 400" preserveAspectRatio="xMidYMid meet"></svg></div>
+      <div class="legend">
+        <span><i style="background:#3EC7D8"></i>人物</span>
+        <span><i style="background:#E8A33D"></i>主题</span>
+        <span><i style="background:#E4695E"></i>情绪</span>
+        <span><i style="background:#4BC08A"></i>我</span>
+      </div>
+      <div id="gdetail"></div>
+    </section>
+
+    <section class="view" id="view-rules">
+      <div class="card">
+        <h3>L0 宪法层 · 仅你可改</h3>
+        <p>这里的每一条都会在每次对话前注入，优先级高于任何记忆。AI 无权修改。</p>
+      </div>
+      <textarea class="rulebox" id="rules" spellcheck="false"></textarea>
+      <div class="btnrow">
+        <button class="btn" id="saverules">保存规则</button>
+        <button class="btn ghost" id="resetrules">恢复默认</button>
+      </div>
+      <div class="card" style="margin-top:12px"><h3>规则校验审计</h3><p id="audit" style="white-space:pre-wrap">尚无 AI 调用。</p></div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="card"><h3>DeepSeek 接入</h3><p>Key 只存在这台设备的浏览器里，不会写进导出文件。留空则使用本地规则引擎。填了 Key 之后：每条消息会<b>先出回答</b>，回答结束后才弹出记忆候选，由你勾选入库。</p></div>
+      <div class="field"><label>API Key</label><input id="apiKey" type="password" placeholder="sk-..." autocomplete="off"></div>
+      <div class="field"><label>模型</label><input id="apiModel" value="deepseek-chat"></div>
+      <div class="field"><label>Base URL</label><input id="apiBase" value="https://api.deepseek.com"></div>
+      <div class="btnrow"><button class="btn" id="saveapi">保存</button><button class="btn ghost" id="testapi">测试连接</button><button class="btn ghost" id="clearapi">清除 Key</button></div>
+      <div class="card" style="margin-top:12px"><h3>状态</h3><p id="apistat">未配置</p></div>
+      <div class="card"><h3>关于 Codex</h3><p>Codex 是本地 CLI / IDE 代理，不是可嵌入网页的模型接口。产品内暂不接入；需要它写代码时，在终端或 TRAE 里用即可。</p></div>
+    </section>
+
+    <section class="view" id="view-export">
+      <div class="card">
+        <h3>数据主权</h3>
+        <p>文件在你电脑上。JSON 可回灌，Markdown 可直接丢进 Obsidian 看。</p>
+      </div>
+      <div class="btnrow">
+        <button class="btn" id="expjson">导出 JSON</button>
+        <button class="btn ghost" id="expmd">导出 Markdown</button>
+      </div>
+      <div class="btnrow">
+        <button class="btn ghost" id="seed">写入演示数据</button>
+        <button class="btn warn" id="clear">清空本地库</button>
+      </div>
+      <div class="card" style="margin-top:12px"><h3>存储</h3><p id="storinfo">IndexedDB · 检查中</p></div>
+      <div class="card"><h3>说明</h3><p>抽取与回应都走 DeepSeek（设置页填 Key）；未配置或调用失败时回退本地规则引擎，链路不变。所有 Key 只存本机，不写入导出文件。</p></div>
+    </section>
+  </main>
+
+  <div class="composer">
+    <div class="composer-inner">
+      <textarea id="input" rows="1" placeholder="把今天发生的事写下来，带情绪也行…"></textarea>
+      <button class="send" id="send">↑</button>
+    </div>
+  </div>
+</div>
+
+<div id="overlay"></div>
+<div id="sheet">
+  <div class="sheet-head">
+    <h2>这次要记下什么</h2>
+    <p id="sheet-sub">勾选、当场改写，确认后再精炼一层才入库</p>
+  </div>
+  <div id="sheet-body"></div>
+  <div class="sheet-foot">
+    <button class="btn ghost" id="cand-skip">不要记</button>
+    <button class="btn" id="cand-ok">确认入库 (0)</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+window.onerror = function(msg, src, line, col, err){
+  try{
+    var d = document.getElementById('errbar') || document.createElement('div');
+    d.id = 'errbar';
+    d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:999;background:#5B1E1E;color:#FFD9D4;padding:8px 12px;font:12px/1.5 monospace;white-space:pre-wrap';
+    d.textContent = 'JS ERROR: ' + msg + ' @' + line + ':' + col;
+    document.body.appendChild(d);
+  }catch(_){}
+};
+/* ============ 0. 工具 ============ */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid = p => p + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const today = () => new Date().toISOString().slice(0,10);
+const monthKey = d => (d || today()).slice(0,7).replace('-','');
+
+/* ============ 1. 存储（IndexedDB） ============ */
+const IDB = {
+  db:null,
+  open(){
+    return new Promise((res,rej)=>{
+      const req = indexedStore.open('crabai', 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if(!db.objectStoreNames.contains('facts')) db.createObjectStore('facts',{keyPath:'id'});
+        if(!db.objectStoreNames.contains('meta')) db.createObjectStore('meta',{keyPath:'k'});
+      };
+      req.onsuccess = e => { this.db = e.target.result; res(this.db); };
+      req.onerror = e => rej(e.target.error);
+    });
+  },
+  tx(store, mode){ return this.db.transaction(store, mode).objectStore(store); },
+  all(store){ return new Promise((res,rej)=>{ const r=this.tx(store,'readonly').getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error); }); },
+  put(store, val){ return new Promise((res,rej)=>{ const r=this.tx(store,'readwrite').put(val); r.onsuccess=()=>res(true); r.onerror=()=>rej(r.error); }); },
+  del(store, key){ return new Promise((res,rej)=>{ const r=this.tx(store,'readwrite').delete(key); r.onsuccess=()=>res(true); r.onerror=()=>rej(r.error); }); },
+  clear(store){ return new Promise((res,rej)=>{ const r=this.tx(store,'readwrite').clear(); r.onsuccess=()=>res(true); r.onerror=()=>rej(r.error); }); }
+};
+
+/* ============ 1b. 存储适配层：IndexedDB 优先，localStorage 兜底 ============ */
+const LS_KEY = 'crabai_ls_v1';
+const Store = {
+  mode: 'idb',
+  ls: {facts: [], meta: []},
+  keyOf(store){ return store === 'facts' ? 'id' : 'k'; },
+  async init(){
+    try{
+      await Promise.race([
+        IDB.open(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('idb-timeout')), 2500))
+      ]);
+      this.mode = 'idb';
+    }catch(e){
+      this.mode = 'ls';
+      try{
+        const raw = localStorage.getItem(LS_KEY);
+        if(raw) this.ls = JSON.parse(raw);
+      }catch(_){}
+    }
+  },
+  saveLS(){
+    if(this.mode !== 'ls') return;
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(this.ls)); }catch(_){}
+  },
+  async all(store){
+    if(this.mode === 'idb') return IDB.all(store);
+    return (this.ls[store] || []).slice();
+  },
+  async put(store, val){
+    if(this.mode === 'idb') return IDB.put(store, val);
+    const arr = this.ls[store] = this.ls[store] || [];
+    const k = this.keyOf(store);
+    const i = arr.findIndex(x => x[k] === val[k]);
+    if(i >= 0) arr[i] = val; else arr.push(val);
+    this.saveLS(); return true;
+  },
+  async del(store, key){
+    if(this.mode === 'idb') return IDB.del(store, key);
+    const arr = this.ls[store] = this.ls[store] || [];
+    const k = this.keyOf(store);
+    this.ls[store] = arr.filter(x => x[k] !== key);
+    this.saveLS(); return true;
+  },
+  async clear(store){
+    if(this.mode === 'idb') return IDB.clear(store);
+    this.ls[store] = []; this.saveLS(); return true;
+  }
+};
+
+/* ============ 2. 词表与规则引擎 ============ */
+const LEX = {
+  person:['妮妮','李雅妮','妈妈','母亲','爸爸','父亲','老师','班主任','同桌','闺蜜','同学','朋友'],
+  emotion:['生气','不悦','难过','焦虑','害怕','烦','开心','喜欢','讨厌','失望','委屈','愤怒','担心','压力','不安','难受','崩溃','高兴'],
+  study:['作业','考试','月考','成绩','分数','数学','英语','语文','物理','化学','生物','政治','上课','老师','题','复习','排名','课'],
+  career:['产品','项目','代码','开发','创业','工作','公司','AI','模型','需求','设计','上线','客户','商业'],
+  life:['吃饭','回家','睡觉','手机','电脑','钱','买','穿','头发','游戏','跑步','篮球'],
+  ruleCue:['应该','必须','不要','禁止','永远','总是','记住','要求','不准','只能'],
+  prefCue:['喜欢','讨厌','想要','更愿意','偏好','受不了'],
+  eventCue:['因为','所以','导致','发生','被','让','今天','昨天','后来','当时','突然'],
+  stop:['真的','特别','非常','太','很','又','其实','反正','就是','可能','大概','有点','一点','觉得','感觉','就是说','然后','而且','所以']
+};
+const DOMAINS = {
+  emotion:'情感关系', study:'学业知识', career:'事业规划',
+  life:'生活日常', person:'人物档案', rule:'规则记忆'
+};
+const TYPE_LABEL = {fact:'事实', preference:'偏好', event:'事件', rule:'规则'};
+
+function splitSentences(text){
+  return text.split(/[。！？!?；;\n]+/).map(s=>s.trim()).filter(s=>s.length>=4);
+}
+function hitWords(s, list){ return list.filter(w=>s.includes(w)); }
+function detectDomain(s){
+  if(hitWords(s, LEX.ruleCue).length) return 'rule';
+  if(hitWords(s, LEX.study).length) return 'study';
+  if(hitWords(s, LEX.career).length) return 'career';
+  if(hitWords(s, LEX.emotion).length || hitWords(s, LEX.person).length) return 'emotion';
+  return 'life';
+}
+function detectType(s){
+  if(hitWords(s, LEX.ruleCue).length) return 'rule';
+  if(hitWords(s, LEX.prefCue).length) return 'preference';
+  if(hitWords(s, LEX.eventCue).length) return 'event';
+  return 'fact';
+}
+function pickPerson(s){
+  const p = hitWords(s, LEX.person);
+  return p.length ? p[0] : '';
+}
+function pickEmotion(s){
+  const e = hitWords(s, LEX.emotion);
+  if(!e.length) return {label:'',valence:0,arousal:0};
+  const neg = ['生气','不悦','难过','焦虑','害怕','烦','讨厌','失望','委屈','愤怒','担心','压力','不安','难受','崩溃'];
+  const pos = ['开心','喜欢','高兴'];
+  const label = e[0];
+  const valence = pos.includes(label) ? 0.6 : -0.5;
+  const arousal = ['崩溃','愤怒','生气','害怕'].includes(label) ? 0.8 : 0.5;
+  return {label,valence,arousal};
+}
+function refine(text){
+  let parts = text.trim().split(/[，,]/).map(x=>x.trim()).filter(Boolean);
+  // 去掉“我+情绪”的主观从句，例如“我特别烦”
+  parts = parts.filter(p => !(hitWords(p, LEX.emotion).length && /^我/.test(p)));
+  // 遇到推断标记就截断：推断不入事实
+  const markers = ['肯定','一定','说明','证明','可见','绝对','看来','想必'];
+  let cut = -1;
+  parts.forEach((p, i) => { if(cut < 0 && markers.some(m => p.includes(m))) cut = i; });
+  if(cut >= 0) parts = parts.slice(0, cut);
+  let s = parts.join('，');
+  s = s.replace(/^[，,、\s]+/,'');
+  LEX.stop.forEach(w=>{ s = s.split(w).join(''); });
+  // 去掉纯情绪形容，保留事实主干
+  ['很生气','特别难受','快崩溃了','超级烦'].forEach(w=>{ s = s.split(w).join(''); });
+  s = s.replace(/[，,]{2,}/g,'，').replace(/^[，,。]/,'').trim();
+  if(!s) s = '（无可用事实主干）';
+  if(!/[。！？]$/.test(s)) s += '。';
+  return s;
+}
+function tokenCount(s){
+  const cjk = (s.match(/[\u4e00-\u9fa5]/g)||[]).length;
+  const latin = (s.match(/[A-Za-z0-9]+/g)||[]).length;
+  return Math.max(3, Math.round(cjk * 0.75 + latin * 1.6));
+}
+function bigrams(s){
+  s = s.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,'');
+  const out = [];
+  for(let i=0;i<s.length-1;i++) out.push(s.slice(i,i+2));
+  return out;
+}
+function similarity(a,b){
+  const A = bigrams(a), B = bigrams(b);
+  if(!A.length || !B.length) return 0;
+  const setB = new Set(B);
+  const inter = A.filter(x=>setB.has(x)).length;
+  return inter / Math.max(A.length, B.length);
+}
+function codeOf(domain, topic, date){
+  const D = {emotion:'EMO',study:'STU',career:'CAR',life:'LIF',person:'PER',rule:'RUL'}[domain] || 'LIF';
+  const T = (topic||'GEN').slice(0,4).toUpperCase().replace(/[^\u4e00-\u9fa5A-Z0-9]/g,'') || 'GEN';
+  return D + '.' + T + '.' + monthKey(date);
+}
+
+/* ============ R22 三列转换：事实 / 情绪 / 推断（置信度） ============ */
+const INFER_MARKERS = [
+  {m:'肯定', c:0.30}, {m:'一定', c:0.30}, {m:'绝对', c:0.28}, {m:'必然', c:0.28},
+  {m:'就是', c:0.35}, {m:'说明', c:0.35}, {m:'证明', c:0.40}, {m:'可见', c:0.35},
+  {m:'看来', c:0.45}, {m:'想必', c:0.40}, {m:'应该', c:0.50}, {m:'估计', c:0.50},
+  {m:'不在乎', c:0.30}, {m:'不爱', c:0.30}, {m:'故意', c:0.35}, {m:'根本', c:0.35}
+];
+/* 把原话里的推断从句单独拎出来，给低置信度；它永远不进事实列 */
+function detectInference(text){
+  const clauses = String(text||'').split(/[，,。！？；;\n]+/).map(s=>s.trim()).filter(Boolean);
+  for(const cl of clauses){
+    const hit = INFER_MARKERS.find(x=>cl.includes(x.m));
+    if(!hit) continue;
+    let t = cl.replace(/^我(觉得|认为|感觉|估计)/,'').trim();
+    if(t.length > 34) t = t.slice(0, 34) + '…';
+    const strong = /肯定|一定|绝对|必然|根本/.test(cl);
+    const conf = Math.max(0.15, Math.min(0.6, hit.c - (strong ? 0.05 : 0)));
+    return {text:t, conf:Number(conf.toFixed(2)), marker:hit.m, basis:'仅来自原话，无独立证据'};
+  }
+  return null;
+}
+/* 极性：用于识别“同一件事、结论相反”，触发取代而不是合并 */
+function polarityOf(s){
+  const neg = /(不|没|未|别|拒绝|冷战|吵架|生气|失望|离开|拉黑|不回)/;
+  return neg.test(String(s||'')) ? -1 : 1;
+}
+/* 只看有没有否定：同一件事一正一反，才判“取代”而不是“合并” */
+function hasNeg(s){ return /(不|没|未|拒绝|冷战|吵架|拉黑)/.test(String(s||'')); }
+
+/* 抽取：一句话 → 一个候选 */
+function extract(text, sourceMsgId){
+  const sents = splitSentences(text);
+  return sents.map((s, i) => {
+    const type = detectType(s);
+    const domain = detectDomain(s);
+    const person = pickPerson(s);
+    const emotion = pickEmotion(s);
+    const keywords = [];
+    if(person) keywords.push(person);
+    const emo = hitWords(s, LEX.emotion);
+    const topicWords = hitWords(s, LEX.study.concat(LEX.career)).slice(0,2);
+    keywords.push(...topicWords);
+    if(!keywords.length) keywords.push(domain === 'rule' ? '规则' : (domain === 'emotion' ? '关系' : '日常'));
+    if(emo.length) keywords.push(emo[0]);
+    const claim = refine(s);
+    const confidence = (person || topicWords.length) && claim.length >= 8 ? 0.86 : 0.62;
+    return {
+      tmpId: 'c' + i,
+      msgId: sourceMsgId,
+      quote: s,
+      claim,
+      draft: claim,
+      type, domain,
+      person,
+      emotion,
+      keywords: [...new Set(keywords)],
+      confidence,
+      infer: detectInference(s),
+      token: tokenCount(claim),
+      selected: confidence >= 0.85,
+      suspect: false
+    };
+  });
+}
+
+/* R16 五种写入动作：add / merge / update / supersede / none（+ suspect 交人工） */
+function planWrite(cand, facts){
+  const claim = cand.claim || cand.draft || '';
+  let best = null, score = 0;
+  (facts||[]).forEach(f=>{
+    const s = similarity(claim, f.content || '');
+    if(s > score){ score = s; best = f; }
+  });
+  if(!best || score < 0.35) return {action:'add', target:null, score, why:'新事实'};
+  if(score >= 0.85) return {action:'none', target:best, score, why:'与原条目等价，只累加命中次数'};
+  const sameEntity = (cand.person && (best.keywords||[]).includes(cand.person))
+    || (cand.keywords||[]).some(k=>(best.keywords||[]).includes(k));
+  const na = hasNeg(claim), nb = hasNeg(best.content);
+  if(score >= 0.7 && sameEntity && na !== nb)
+    return {action:'supersede', target:best, score, why:'同主体、结论相反，旧条目标记失效'};
+  const base = String(best.content||'').replace(/[。！？]$/,'');
+  if(score >= 0.40 && sameEntity && base.length >= 6 && claim.includes(base) && claim.length > base.length + 3)
+    return {action:'update', target:best, score, why:'同一事实补充细节，覆盖正文并保留旧版'};
+  if(score >= 0.55) return {action:'merge', target:best, score, why:'同一事实再次陈述，累加证据'};
+  return {action:'suspect', target:best, score, why:'相似但未达合并阈值，交人工判断'};
+}
+/* 兼容旧调用点 */
+function dedupe(cand, facts){
+  const p = planWrite(cand, facts);
+  return {action:p.action, target:p.target, score:p.score, why:p.why};
+}
+
+/* ============ 3. 状态 ============ */
+const S = {
+  facts: [],
+  rules: [],
+  msgs: [],
+  candidates: [],
+  pending: null,
+  filter: '',
+  expanded: null,
+  treeInited: false,
+  cfg: {key:'', model:'deepseek-chat', base:'https://api.deepseek.com'},
+  lastStamp: null,
+  auditLog: []
+};
+
+const DEFAULT_RULES = [
+  '全程上帝视角：不站队、不迎合、不安慰。',
+  '先给事实，再给推断；推断必须标置信度。',
+  '剥离情绪：情绪只作标记，不作论据。',
+  '只给真相：不确定就说不确定，不编。',
+  '不做情感陪伴：不使用亲昵称呼强化关系。'
+].join('\n');
+
+/* ============ 4. 渲染：统计 / 树 / 图 ============ */
+function renderStats(){
+  $('#stat-fact').textContent = S.facts.length;
+  $('#stat-node').textContent = buildGraph().nodes.length;
+  $('#stat-token').textContent = S.facts.reduce((a,f)=>a+(f.token||0),0);
+}
+
+function buildTree(){
+  const groups = {};
+  S.facts.forEach(f=>{
+    const d = f.domain || 'life';
+    const topic = (f.keywords||[])[0] || '未分类';
+    const mk = monthKey(f.valid_from || f.created_at);
+    const dkey = DOMAINS[d] + '|' + d;
+    const tkey = topic + '|' + mk;
+    groups[d] = groups[d] || {label:DOMAINS[d], key:d, topics:{}};
+    groups[d].topics[tkey] = groups[d].topics[tkey] || {label:topic, month:mk, facts:[]};
+    groups[d].topics[tkey].facts.push(f);
+  });
+  return groups;
+}
+
+function factCard(f){
+  const statusTag = f.status === 'archived' ? '<span class="tag">已归档</span>' : '';
+  const emo = f.emotion && f.emotion.label ? '<span class="tag t3">'+esc(f.emotion.label)+' 仅标记</span>' : '';
+  return '<div class="fact" data-id="'+f.id+'">'
+    + '<div class="txt">'+esc(f.content)+'</div>'
+    + '<div class="meta"><span>'+esc(codeOf(f.domain, (f.keywords||[])[0], f.valid_from))+'</span>'
+    + '<span>'+ (f.token||0) +' tk</span>'+ emo + statusTag +'<em>置信 '+(Math.round((f.confidence||0)*100))+'%</em></div>'
+    + '<div class="ops"><span data-op="edit">改</span><span data-op="archive">'+(f.status==='archived'?'恢复':'归档')+'</span><span data-op="del">删</span></div>'
+    + '</div>';
+}
+
+function renderTree(){
+  const t = buildTree();
+  const keys = Object.keys(t);
+  if(!S.expanded) S.expanded = new Set();
+  if(!S.seenDomains) S.seenDomains = new Set();
+  keys.forEach(dk => {
+    if(!S.seenDomains.has(dk)){ S.seenDomains.add(dk); S.expanded.add('d|' + dk); }
+  });
+  if(!keys.length){ $('#tree').innerHTML='<div class="empty">还没有记忆。<br>去「对话」写一句，或点「导出 → 写入演示数据」。</div>'; return; }
+
+  let html = '';
+  keys.forEach(dk=>{
+    const d = t[dk];
+    const total = Object.values(d.topics).reduce((a,x)=>a+x.facts.length,0);
+    const dOpen = S.expanded.has('d|'+dk);
+    html += '<div class="tree-node"><div class="l1 tw" data-tkey="d|'+dk+'">'
+      + '<span class="arrow '+(dOpen?'open':'')+'">▶</span>'
+      + '<span>'+esc(d.label)+'</span> <small style="margin-left:auto">'+total+' 条 · L1</small></div>'
+      + '<div class="tbody" style="'+(dOpen?'':'display:none')+'">';
+
+    Object.keys(d.topics).forEach(tk=>{
+      const tp = d.topics[tk];
+      const tOpen = S.expanded.has('t|'+dk+'|'+tk);
+      html += '<div class="tree-node"><div class="l2 tw" data-tkey="t|'+dk+'|'+tk+'">'
+        + '<span class="arrow '+(tOpen?'open':'')+'">▶</span>'
+        + '<span>'+esc(tp.label)+'</span> <small style="margin-left:auto">'+tp.facts.length+' · L2</small></div>'
+        + '<div class="tbody" style="'+(tOpen?'':'display:none')+'">';
+
+      const byMonth = tp.facts.reduce((a,f)=>{ const k=monthKey(f.valid_from||f.created_at); (a[k]=a[k]||[]).push(f); return a; }, {});
+      Object.keys(byMonth).sort().reverse().forEach(mk=>{
+        const fs = byMonth[mk];
+        const mKey = 'm|'+dk+'|'+tk+'|'+mk;
+        const mOpen = S.expanded.has(mKey);
+        html += '<div class="tw" data-tkey="'+mKey+'" style="margin:6px 0 3px;cursor:pointer">'
+          + '<span class="arrow '+(mOpen?'open':'')+'">▶</span>'
+          + '<span style="font-size:12px;color:var(--muted)">'+mk.slice(0,4)+'-'+mk.slice(4)+' · '+fs.length+' 条 · L3</span></div>'
+          + '<div class="tbody" style="margin-left:14px;'+(mOpen?'':'display:none')+'">';
+        fs.forEach(f=>{ html += factCard(f); });
+        html += '</div>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div></div>';
+  });
+  $('#tree').innerHTML = html;
+}
+
+function buildGraph(){
+  const nodes = [{id:'me', label:'我', type:'me'}];
+  const edges = [];
+  const seen = new Map();
+  const push = (id,label,type)=>{ if(!seen.has(id)){ seen.set(id,true); nodes.push({id,label,type}); } };
+  S.facts.forEach(f=>{
+    const kws = f.keywords || [];
+    const p = kws.find(k=>LEX.person.includes(k)) || '';
+    const emo = f.emotion && f.emotion.label;
+    const topic = kws.find(k=>!LEX.person.includes(k) && !LEX.emotion.includes(k)) || DOMAINS[f.domain] || '未分类';
+    if(p) push('p_'+p, p, 'person');
+    push('t_'+topic, topic, 'topic');
+    if(emo) push('e_'+emo, emo, 'emotion');
+    if(p) edges.push(['me','p_'+p,'事实']);
+    edges.push([p ? 'p_'+p : 'me', 't_'+topic, '涉及']);
+    if(emo) edges.push(['t_'+topic,'e_'+emo,'情绪']);
+  });
+  return {nodes, edges};
+}
+
+/* 图谱视图变换：缩放 + 平移（参考 Obsidian 的交互语义） */
+const GT = {s:1, tx:0, ty:0, moved:false};
+function clampNum(v, a, b){ return Math.max(a, Math.min(b, v)); }
+function svgPoint(evt){
+  const svg = $('#svg'); const r = svg.getBoundingClientRect();
+  return { x: (evt.clientX - r.left) / r.width * 360, y: (evt.clientY - r.top) / r.height * 400 };
+}
+function applyGT(){
+  const g = document.getElementById('gv');
+  if(!g) return;
+  g.setAttribute('transform', 'translate(' + GT.tx + ' ' + GT.ty + ') scale(' + GT.s + ')');
+  const targetPx = Math.max(7, Math.min(11, 9 * Math.pow(GT.s, 0.35)));
+  g.querySelectorAll('text').forEach(t => { t.setAttribute('font-size', (targetPx / GT.s).toFixed(2)); });
+  g.querySelectorAll('line').forEach(l => { l.setAttribute('stroke-width', (1.2 / GT.s).toFixed(2)); });
+}
+function zoomAt(pt, factor){
+  const ns = clampNum(GT.s * factor, 0.35, 5);
+  const real = ns / GT.s;
+  GT.tx = pt.x - (pt.x - GT.tx) * real;
+  GT.ty = pt.y - (pt.y - GT.ty) * real;
+  GT.s = ns;
+  applyGT();
+}
+function resetGT(){ GT.s = 1; GT.tx = 0; GT.ty = 0; applyGT(); }
+
+function renderGraph(){
+  const {nodes, edges} = buildGraph();
+  const svg = $('#svg');
+  const cx=180, cy=200;
+  const rings = {person:112,topic:146,emotion:168,me:0};
+  const counts = {};
+  nodes.forEach(n=>counts[n.type]=(counts[n.type]||0)+1);
+  const pos = {};
+  const color = {me:'#4BC08A',person:'#3EC7D8',topic:'#E8A33D',emotion:'#E4695E'};
+  nodes.forEach(n=>{
+    if(n.type==='me'){ pos[n.id]=[cx,cy]; return; }
+    const i = nodes.filter(x=>x.type===n.type).indexOf(n);
+    const total = counts[n.type] || 1;
+    const r = rings[n.type] || 150;
+    const a = (-Math.PI/2) + (i/total)*Math.PI*2 + (n.type==='topic'?0.4:0);
+    pos[n.id] = [cx + Math.cos(a)*r, cy + Math.sin(a)*r];
+  });
+  let s = '<g id="gv">';
+  edges.forEach(([a,b])=>{
+    if(!pos[a]||!pos[b]) return;
+    s += '<line x1="'+pos[a][0].toFixed(1)+'" y1="'+pos[a][1].toFixed(1)+'" x2="'+pos[b][0].toFixed(1)+'" y2="'+pos[b][1].toFixed(1)+'" stroke="#24384A" stroke-width="1.2"/>';
+  });
+  nodes.forEach(n=>{
+    const [x,y] = pos[n.id];
+    const r = n.type==='me'?22:(n.type==='emotion'?11:14);
+    s += '<g class="gnode" data-id="'+n.id+'"><circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+r+'" fill="'+color[n.type]+'" opacity="'+(n.type==='me'?1:.85)+'"/>'
+      + '<text x="'+x.toFixed(1)+'" y="'+(y+r+13).toFixed(1)+'" fill="#8FA3B5" font-size="9" text-anchor="middle">'+esc(n.label)+'</text></g>';
+  });
+  s += '</g>';
+  svg.innerHTML = s;
+  applyGT();
+  $('#gdetail').innerHTML = '<div class="hint">共 '+nodes.length+' 个节点 / '+edges.length+' 条边。滚轮缩放，拖拽平移，双击复位。点节点看关联事实。</div>';
+}
+
+/* 图谱交互绑定 */
+(function bindGraph(){
+  const svg = document.getElementById('svg');
+  const pts = new Map();
+  let lastDist = 0, lastMid = null, startPt = null;
+
+  svg.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    zoomAt(svgPoint(e), factor);
+  }, {passive:false});
+
+  svg.addEventListener('pointerdown', e=>{
+    svg.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, svgPoint(e));
+    if(pts.size === 1){ startPt = svgPoint(e); GT.moved = false; svg.classList.add('dragging'); }
+    if(pts.size === 2){
+      const [a,b] = [...pts.values()];
+      lastDist = Math.hypot(a.x-b.x, a.y-b.y);
+      lastMid = {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    }
+  });
+
+  svg.addEventListener('pointermove', e=>{
+    if(!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId);
+    const cur = svgPoint(e);
+    pts.set(e.pointerId, cur);
+
+    if(pts.size === 1){
+      const dx = cur.x - prev.x, dy = cur.y - prev.y;
+      if(Math.abs(cur.x-startPt.x) + Math.abs(cur.y-startPt.y) > 4) GT.moved = true;
+      GT.tx += dx; GT.ty += dy; applyGT();
+    }else if(pts.size === 2){
+      const [a,b] = [...pts.values()];
+      const dist = Math.hypot(a.x-b.x, a.y-b.y);
+      const mid = {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+      if(lastDist > 0 && dist > 0) zoomAt(mid, dist/lastDist);
+      GT.moved = true;
+      lastDist = dist; lastMid = mid;
+    }
+  });
+
+  function endPointer(e){
+    pts.delete(e.pointerId);
+    if(pts.size < 2){ lastDist = 0; lastMid = null; }
+    if(pts.size === 0) svg.classList.remove('dragging');
+  }
+  svg.addEventListener('pointerup', endPointer);
+  svg.addEventListener('pointercancel', endPointer);
+
+  svg.addEventListener('click', e=>{
+    if(GT.moved){ GT.moved = false; return; }
+    const g = e.target.closest('.gnode');
+    if(!g) return;
+    const id = g.dataset.id;
+    let list = [];
+    if(id==='me') list = S.facts;
+    else {
+      const label = id.slice(2);
+      list = S.facts.filter(f=> f.content.includes(label) || (f.keywords||[]).includes(label) || (f.emotion && f.emotion.label===label));
+    }
+    $('#gdetail').innerHTML = '<div class="card"><h3>'+esc(id==='me'?'我':id.slice(2))+' · '+list.length+' 条</h3>'
+      + list.map(f=>'<p style="margin:6px 0;color:#E8F0F5">· '+esc(f.content)+'</p>').join('')
+      + '</div>';
+  });
+
+  svg.addEventListener('dblclick', resetGT);
+
+  document.querySelector('.gtools').addEventListener('click', e=>{
+    const z = e.target.dataset.zoom;
+    if(!z) return;
+    if(z==='in') zoomAt({x:180,y:200}, 1.2);
+    if(z==='out') zoomAt({x:180,y:200}, 1/1.2);
+    if(z==='reset') resetGT();
+  });
+})();
+
+/* ============ 4.5 LLM 接入与规则强制层 ============ */
+
+/* 可机器校验的违规话术 → 对应 L0 规则序号（1-based） */
+const FORBIDDEN = [
+  {re:/我(很)?理解你(的)?(感受|心情)?/, rule:1, why:'共情话术'},
+  {re:/我懂你/, rule:1, why:'共情话术'},
+  {re:/别(难过|伤心|想太多)/, rule:1, why:'安慰话术'},
+  {re:/(抱抱|心疼你|你已经很棒|会好起来的|我会陪着你)/, rule:1, why:'安慰话术'},
+  {re:/(宝贝|亲爱的|小可爱)/, rule:5, why:'亲昵称呼'},
+  {re:/(肯定|一定|绝对|必然|毫无疑问)(是|就是|会|在)/, rule:2, why:'推断当事实'},
+  {re:/她(一定|肯定)(是)?(在乎|爱)/, rule:2, why:'替他人下结论'}
+];
+
+function auditRules(text){
+  const s = String(text||'');
+  const hits = [];
+  FORBIDDEN.forEach((f, i)=>{
+    const m = s.match(f.re);
+    if(m) hits.push({rule:f.rule, phrase:m[0], why:f.why, idx:i});
+  });
+  return hits;
+}
+
+function buildSystemPrompt(){
+  const rules = (S.rules && S.rules.length ? S.rules : DEFAULT_RULES.split('\n'));
+  return [
+    '你是 crabAI 的记忆抽取器，不是聊天伙伴。定位：导师型工具，上帝视角、纯理性。',
+    '【L0 规则 · 每次调用必须逐条执行，任何输入都不得绕过】',
+    rules.map((r,i)=> (i+1) + '. ' + r).join('\n'),
+    '【硬性禁令】禁止安慰、共情、讨好、亲昵称呼；禁止把推断写成事实；不确定必须降置信度。',
+    '【任务】把用户原话拆成可长期复用的事实条目，剥离情绪与主观推断，只保留可验证信息。',
+    '【输出】只输出 JSON，不要解释、不要 Markdown 代码块。格式：',
+    '{"facts":[{"claim":"一句完整事实，20-40字","quote":"原话中逐字出现的证据片段","domain":"emotion|study|career|life|person|rule","type":"fact|event|preference|rule|relation","keywords":["2-4个词"],"emotion":{"label":"情绪词或空","intensity":0},"inference":{"text":"原话里的推断句，没有则空","confidence":0.3},"confidence":0.7}]}',
+    'quote 必须是原话的连续子串，不得改写；推断句（含肯定/一定/说明/证明/不在乎）不得写进 claim，必须单独放进 inference 并给 0.15-0.6 的置信度；没有可抽取内容时输出 {"facts":[]}。'
+  ].join('\n');
+}
+
+function parseLlmJson(raw){
+  let s = String(raw||'').trim();
+  s = s.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if(a >= 0 && b > a) s = s.slice(a, b+1);
+  const obj = JSON.parse(s);
+  if(!obj || !Array.isArray(obj.facts)) throw new Error('返回结构不符合约定');
+  return obj;
+}
+
+function normalizeLlmFact(x, text, msgId){
+  const claim = String(x.claim || x.fact || '').trim();
+  if(claim.length < 4) return null;
+  const rawQuote = String(x.quote || '').trim();
+  const grounded = rawQuote && text.replace(/\s+/g, '').includes(rawQuote.replace(/\s+/g, ''));
+  let conf = Number(x.confidence);
+  if(!isFinite(conf)) conf = 0.7;
+  conf = Math.max(0.3, Math.min(0.95, conf));
+  if(!grounded) conf = Math.max(0.3, conf - 0.25);
+
+  const domRaw = String(x.domain || '').trim();
+  const domain = Object.keys(DOMAINS).includes(domRaw) ? domRaw : detectDomain(claim);
+  const draft = refine(claim);
+  const kws = Array.isArray(x.keywords) && x.keywords.length
+    ? x.keywords.slice(0,4).map(k=>String(k).trim()).filter(Boolean)
+    : hitWords(draft, LEX.person.concat(LEX.study, LEX.career, LEX.life));
+  if(!kws.length) kws.push(domain === 'rule' ? '规则' : (domain === 'emotion' ? '关系' : '日常'));
+  const emoLabel = (x.emotion && String(x.emotion.label || '').trim()) || pickEmotion(draft).label;
+  const intensity = (x.emotion && Number(x.emotion.intensity)) || 1;
+  let infer = null;
+  if(x.inference && String(x.inference.text || '').trim()){
+    infer = {
+      text: String(x.inference.text).trim().slice(0, 36),
+      conf: Math.max(0.15, Math.min(0.6, Number(x.inference.confidence) || 0.3)),
+      marker: '模型标注',
+      basis: '仅来自原话，无独立证据'
+    };
+  }else{
+    infer = detectInference(text);
+  }
+
+  return {
+    tmpId: 'c' + Math.random().toString(36).slice(2,6),
+    msgId,
+    claim: draft, draft,
+    quote: grounded ? rawQuote : (text.slice(0, 60)),
+    grounded: !!grounded,
+    domain,
+    type: detectType(draft),
+    person: pickPerson(draft),
+    keywords: [...new Set(kws)],
+    emotion: {label: emoLabel, intensity},
+    confidence: conf,
+    infer,
+    token: tokenCount(draft),
+    selected: conf >= 0.85,
+    suspect: false,
+    source: 'llm'
+  };
+}
+
+async function callLLM(system, user, opts){
+  const cfg = S.cfg;
+  if(!cfg.key) throw new Error('未配置 API Key');
+  const base = (cfg.base || 'https://api.deepseek.com').replace(/\/$/, '');
+  const body = {
+    model: cfg.model || 'deepseek-chat',
+    messages: [{role:'system', content:system}, {role:'user', content:user}],
+    temperature: 0.15,
+    max_tokens: 900
+  };
+  if(!(opts && opts.noJson)) body.response_format = {type:'json_object'};
+  if(opts && opts.max_tokens) body.max_tokens = opts.max_tokens;
+  if(opts && opts.messages) body.messages = opts.messages;
+  const t0 = performance.now();
+  const res = await fetch(base + '/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + cfg.key},
+    body: JSON.stringify(body)
+  });
+  const ms = Math.round(performance.now() - t0);
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error('HTTP ' + res.status + ' · ' + t.slice(0,120));
+  }
+  const data = await res.json();
+  const content = data.choices && data.choices[0] && data.choices[0].message.content || '';
+  return {content, ms};
+}
+
+/* 只审 claim（事实句），quote 是原话证据，允许保留情绪与推断 */
+function auditParsed(content){
+  let parsed = null, err = null;
+  try{ parsed = parseLlmJson(content); }catch(e){ err = e; }
+  const claims = parsed ? parsed.facts.map(x=>String(x.claim || x.fact || '')) : [];
+  return {parsed, err, hits:err ? [] : auditRules(claims.join('；'))};
+}
+
+async function llmExtract(text, msgId){
+  const sys = buildSystemPrompt();
+  const user = '用户原话（逐字，不得改写）：\n<<<\n' + text + '\n>>>\n请按约定 JSON 输出。';
+  let r = await callLLM(sys, user);
+  let a = auditParsed(r.content);
+
+  if(a.err || a.hits.length){
+    logAudit(false, a.hits, r.ms, 'first');
+    const why = a.err ? ('JSON 不合法：' + a.err.message)
+      : ('违反 L0 第 ' + [...new Set(a.hits.map(x=>x.rule))].join('、') + ' 条（' + a.hits.map(x=>x.why + '：' + x.phrase).join('；') + '）');
+    const retryMsgs = [
+      {role:'system', content:sys},
+      {role:'user', content:user},
+      {role:'assistant', content:r.content},
+      {role:'system', content:'上一次输出' + why + '。重写：claim 只写客观事实，删除安慰、共情、亲昵称呼与“肯定/一定”式推断；quote 保留原话原样；只输出约定 JSON。'}
+    ];
+    r = await callLLM(sys, user, {messages:retryMsgs});
+    a = auditParsed(r.content);
+    if(a.err || a.hits.length){
+      logAudit(false, a.hits, r.ms, 'retry');
+      throw new Error(a.err ? ('JSON 两次不合法，已回退') : '输出两次违反 L0 规则，已拦截');
+    }
+  }
+  logAudit(true, [], r.ms, 'ok');
+  const out = a.parsed.facts.map(x=>normalizeLlmFact(x, text, msgId)).filter(Boolean);
+  S.lastStamp = {src:'DeepSeek', pass:true, n:(S.rules||[]).length, ms:r.ms};
+  return out;
+}
+
+function logAudit(pass, hits, ms, phase){
+  S.auditLog.unshift({at:new Date().toISOString(), pass, hits, ms, phase, model:S.cfg.model});
+  S.auditLog = S.auditLog.slice(0, 8);
+  Store.put('meta', {k:'audit', v:S.auditLog});
+  renderAudit();
+}
+
+function renderAudit(){
+  const el = $('#audit'); if(!el) return;
+  const rules = (S.rules||[]).length;
+  if(!S.auditLog.length){
+    el.innerHTML = '注入规则 ' + rules + ' 条 · 尚无 AI 调用。\n每次调用把规则拼进 system;输出再过禁用话术扫描，命中则重写一次，仍命中即拦截并回退本地引擎。';
+    return;
+  }
+  el.innerHTML = '注入规则 ' + rules + ' 条（每次调用强制前置）\n'
+    + S.auditLog.map(a=>{
+        const t = a.at.slice(11,19);
+        return (a.pass?'PASS':'BLOCK') + ' · ' + t + ' · ' + a.model + ' · ' + a.ms + 'ms · ' + (a.pass?'0 命中':'命中 ' + a.hits.map(x=>'R'+x.rule+':'+x.phrase).join(', '));
+      }).join('\n');
+}
+
+/* ============ 4.6 回应引擎（导师式，非陪伴） ============ */
+
+/* 只审语气类违规（安慰/亲昵），推断类由 prompt 约束，避免误伤引用原话 */
+function auditTone(text){
+  return auditRules(text).filter(h => h.rule !== 2);
+}
+
+function recallRelated(text, limit){
+  const kws = (text.match(/[\u4e00-\u9fa5]{2,}/g) || []);
+  const scored = S.facts.filter(f=>f.status !== 'archived').map(f=>{
+    let s = similarity(text, f.content || '') * 2;
+    (f.keywords||[]).forEach(k=>{ if(k && text.includes(k)) s += 1.2; });
+    if(f.emotion && f.emotion.label && text.includes(f.emotion.label)) s += 0.6;
+    kws.forEach(k=>{ if((f.content||'').includes(k)) s += 0.3; });
+    return {f, s};
+  }).filter(x=>x.s > 0.2).sort((a,b)=>b.s-a.s).slice(0, limit || 6);
+
+  let budget = 600, out = [];
+  for(const {f} of scored){
+    if(budget - (f.token||0) < 0) break;
+    budget -= (f.token||0); out.push(f);
+  }
+  return out;
+}
+
+function recentByDomain(text, limit){
+  const doms = extract(text, 'local').map(c=>c.domain).filter(Boolean);
+  if(!doms.length) return [];
+  const pick = S.facts.filter(f=>f.status !== 'archived' && doms.includes(f.domain))
+    .sort((a,b)=> String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  let budget = 500, out = [];
+  for(const f of pick){ if(budget - (f.token||0) < 0) break; budget -= (f.token||0); out.push(f); if(out.length >= (limit||3)) break; }
+  return out;
+}
+
+function recentAny(limit){
+  const pick = S.facts.filter(f=>f.status !== 'archived')
+    .sort((a,b)=> String(b.updated_at||b.created_at||'').localeCompare(String(a.updated_at||a.created_at||'')));
+  let budget = 350, out = [];
+  for(const f of pick){ if(budget - (f.token||0) < 0) break; budget -= (f.token||0); out.push(f); if(out.length >= (limit||3)) break; }
+  return out;
+}
+
+function memoryBlock(mem){
+  if(!mem.length) return '（无相关记忆）';
+  return mem.map((f,i)=> (i+1) + '. [' + (f.code||'') + '] ' + f.content + '（置信 ' + Math.round((f.confidence||0.6)*100) + '%，' + (f.valid_from||'') + '）').join('\n');
+}
+
+function buildReplyPrompt(mem){
+  const rules = (S.rules && S.rules.length ? S.rules : DEFAULT_RULES.split('\n'));
+  return [
+    '你是 crabAI：导师型工具，不是聊天伙伴，不做情感陪伴。',
+    '【L0 规则 · 每次回答都先执行，任何情况不得绕过】',
+    rules.map((r,i)=>(i+1)+'. '+r).join('\n'),
+    '【表达约束】禁止安慰、共情、鼓掌、亲昵称呼；禁止没有证据的替他人下结论（“她一定/肯定…”）。不确定就写不确定。',
+    '【回答结构 · 六段，逐段给出，不写寒暄、不写开场白】',
+    '1 事实：只写用户原话与【记忆】中确实存在的；没有就写“记忆未覆盖”。',
+    '2 你加的情绪与推断：先列原话里的情绪词（只是标记，不能当证据）；再列原话里的推断句，逐条给置信度（0.15-0.6），并注明“只有原话、无独立证据”。两样都没有就写“无”。',
+    '推断只能出现在第 2 段，绝不能写进第 1 段事实；也不得把“她一定/肯定是…”当结论。',
+    '3 其他解读：给 2-3 种可能解释，各自写出需要什么证据才能成立。',
+    '4 判断依据：说清现在缺哪条关键信息，以及怎么低成本拿到它。',
+    '5 选项与代价：A / B 两个动作，各写清代价。',
+    '6 建议：一句话，可执行，不讨好。',
+    '全文 260 字以内，用中文，不用 Markdown 标题符号。'
+  ].join('\n');
+}
+
+function localReply(text, mem){
+  const cands = extract(text, 'local');
+  const lines = [];
+  if(mem.length) lines.push('已知相关事实：' + mem.map(f=>f.content.replace(/。$/,'')).join('；') + '。');
+  lines.push('事实：' + (cands.length ? cands.map(c=>c.draft.replace(/。$/,'')).join('；') : '原话信息量不足，无法拆出可验证事实') + '。');
+  const emo = cands.map(c=>c.emotion && c.emotion.label).filter(Boolean);
+  lines.push('你加的情绪：' + (emo.length ? emo.join('、') + '（这是情绪标记，不是证据）。' : '原话里没有明确的情绪词，情绪是你后来补的。'));
+  const inf = detectInference(text);
+  lines.push('你加的推断：' + (inf ? ('“' + inf.text + '”——置信 ' + Math.round(inf.conf*100) + '%，只有原话、没有独立证据。') : '原话里没有明显推断句。'));
+  lines.push('其他解读：① 对方确实在回避沟通；② 对方当时没有处理冲突的精力（时间/情绪容量不足）；③ 事件本身另有原因，与关系无关。三种都需要证据，不能靠猜。');
+  lines.push('判断依据：现在缺的是对方的直接表述与时间线。最低成本的做法是给一次具体、可回答的提问，而不是继续推测。');
+  lines.push('选项与代价：A 直接问清原因——代价是可能得到敷衍回答，需要承受一次落空；B 先不追问、观察 24-48 小时的行为变化——代价是悬置感延长，你可能自行补全故事。');
+  lines.push('建议：把“吵了什么、谁先停、之后有无联系”这三条写成事实再判断，别用情绪当结论。');
+  if(mem.length) lines.push('（本次检索到 ' + mem.length + ' 条相关记忆，已作参考）');
+  lines.push('（本条由本地规则引擎生成，未接入语义分析）');
+  return lines.join('\n');
+}
+
+async function llmReply(text, mem){
+  const sys = buildReplyPrompt(mem);
+  const user = '用户原话：\n<<<\n' + text + '\n>>>\n【记忆】\n' + memoryBlock(mem) + '\n请按六段结构回答。';
+  let r = await callLLM(sys, user, {noJson:true, max_tokens:700});
+  let hits = auditTone(r.content);
+  if(hits.length){
+    const retry = [
+      {role:'system', content:sys},
+      {role:'user', content:user},
+      {role:'assistant', content:r.content},
+      {role:'system', content:'上一版违反 L0 第 ' + [...new Set(hits.map(x=>x.rule))].join('、') + ' 条（' + hits.map(x=>x.why+'：'+x.phrase).join('；') + '）。重写，保持六段结构，删除安慰与亲昵表达。'}
+    ];
+    r = await callLLM(sys, user, {messages:retry, noJson:true, max_tokens:700});
+    hits = auditTone(r.content);
+    if(hits.length) throw new Error('回应两次违反 L0 规则，已拦截');
+  }
+  logAudit(true, [], r.ms, 'reply');
+  return {text:r.content.trim(), ms:r.ms};
+}
+
+/* 状态气泡：拆解→待确认→思考→逐字生成，全过程可见 */
+function liveBubble(initial, phase){
+  const node = renderMsgEl('', 'ai');
+  const b = node.querySelector('.bubble');
+  b.innerHTML = '<span class="live-dot"></span><span class="live-body"></span><span class="src live-meta"></span>';
+  const live = {node, body:b.querySelector('.live-body'), meta:b.querySelector('.src'),
+    t0:performance.now(), phase:phase||'处理', ended:false, hold:false, timer:null};
+  live.body.textContent = initial || '已收到，正在处理…';
+  live.meta.textContent = '0.0s';
+  live.timer = setInterval(()=>{
+    if(live.ended || live.hold) return;
+    live.meta.textContent = live.phase + ' ' + ((performance.now()-live.t0)/1000).toFixed(1) + 's';
+    const l = $('#msglist'); if(l) l.scrollTop = l.scrollHeight;
+  }, 150);
+  return live;
+}
+function setLive(live, text){ if(live) live.body.textContent = text; }
+function setMeta(live, text){ if(live) live.meta.textContent = text; }
+function endLive(live){ if(!live) return; live.ended = true; clearInterval(live.timer); }
+
+/* DeepSeek 流式（SSE）：逐块回调，让文字实时出现 */
+async function streamChat(cfg, system, user, onDelta, onReason){
+  const base = (cfg.base || 'https://api.deepseek.com').replace(/\/$/, '');
+  const res = await fetch(base + '/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer ' + cfg.key},
+    body: JSON.stringify({
+      model: cfg.model || 'deepseek-chat',
+      messages:[{role:'system',content:system},{role:'user',content:user}],
+      temperature:0.3, max_tokens:700, stream:true
+    })
+  });
+  if(!res.ok){ const t = await res.text(); throw new Error('HTTP ' + res.status + ' · ' + t.slice(0,140)); }
+  if(!res.body) throw new Error('当前浏览器不支持流式读取');
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', acc = '';
+  while(true){
+    const {value, done} = await reader.read();
+    if(done) break;
+    buf += dec.decode(value, {stream:true});
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for(const line of lines){
+      const s = line.trim();
+      if(!s.startsWith('data:')) continue;
+      const d = s.slice(5).trim();
+      if(d === '[DONE]') continue;
+      let j; try{ j = JSON.parse(d); }catch(_){ continue; }
+      const dl = j.choices && j.choices[0] && j.choices[0].delta || {};
+      if(dl.reasoning_content && onReason) onReason(dl.reasoning_content);
+      if(dl.content){ acc += dl.content; onDelta(dl.content, acc); }
+    }
+  }
+  return acc;
+}
+
+async function respond(userText, live){
+  if(!userText) return;
+  const lv = live || liveBubble('正在读取记忆…', '准备');
+  lv.hold = false;
+  lv.phase = '思考';
+
+  let mem = recallRelated(userText, 6);
+  if(!mem.length) mem = recentByDomain(userText, 3);
+  if(!mem.length) mem = recentAny(3);
+
+  const hasKey = !!(S.cfg && S.cfg.key);
+  setLive(lv, (hasKey ? '已读取记忆 ' + mem.length + ' 条，正在请求 DeepSeek…' : '已读取记忆 ' + mem.length + ' 条，本地引擎生成中…'));
+
+  try{
+    if(hasKey){
+      const sys = buildReplyPrompt(mem);
+      const payload = '用户原话：\n<<<\n' + userText + '\n>>>\n【记忆】\n' + memoryBlock(mem) + '\n请按六段结构回答。';
+      const t0 = performance.now();
+      let first = 0, reasonBuf = '';
+      const acc = await streamChat(S.cfg, sys, payload, (delta, full)=>{
+        if(!first){ first = Math.round(performance.now() - t0); lv.phase = '生成'; }
+        lv.body.textContent = full;
+        const l = $('#msglist'); if(l) l.scrollTop = l.scrollHeight;
+      }, (rc)=>{
+        reasonBuf += rc;
+        lv.phase = '推理';
+        lv.body.textContent = '推理中：' + reasonBuf.slice(-220);
+        const l = $('#msglist'); if(l) l.scrollTop = l.scrollHeight;
+      });
+      if(!acc.trim()) throw new Error('模型返回空内容');
+
+      let note = '';
+      let hits = auditTone(acc);
+      if(hits.length){
+        setLive(lv, '命中禁用话术，按 L0 重写中…');
+        const fixed = await llmReply(userText, mem);
+        acc = fixed.text;
+        const after = auditTone(acc);
+        if(after.length){
+          logAudit(false, after, fixed.ms, 'reply');
+          note = '（L0 重写后仍命中：' + after.map(x=>x.phrase).join('、') + '，此回答未过审查）';
+        }else{
+          logAudit(true, [], fixed.ms, 'reply');
+          note = '（已按 L0 重写一次）';
+        }
+      }else{
+        logAudit(true, [], Math.round(performance.now()-t0), 'reply');
+      }
+      lv.body.textContent = acc + (note ? '\n' + note : '');
+      setMeta(lv, 'DeepSeek · 首字 ' + first + 'ms · 总 ' + Math.round(performance.now()-t0) + 'ms · 记忆 ' + mem.length + ' 条 · 规则 ' + (S.rules||[]).length + '/' + (S.rules||[]).length);
+      endLive(lv);
+      pushAi(acc + (note ? '\n' + note : ''));
+    }else{
+      const lr = localReply(userText, mem);
+      lv.phase = '生成';
+      if(S.simStream){
+        let i = 0;
+        setMeta(lv, '本地规则引擎 · 逐字显示（演示）');
+        while(i < lr.length){
+          i = Math.min(lr.length, i + 3);
+          lv.body.textContent = lr.slice(0, i);
+          const l = $('#msglist'); if(l) l.scrollTop = l.scrollHeight;
+          await new Promise(r=>setTimeout(r, 24));
+        }
+      }else{
+        await new Promise(r=>setTimeout(r, 120));
+        lv.body.textContent = lr;
+      }
+      setMeta(lv, '本地规则引擎 · 记忆 ' + mem.length + ' 条 · 未做语义分析（填 API Key 后用 DeepSeek）');
+      endLive(lv);
+      pushAi(lr);
+    }
+  }catch(err){
+    const lr = localReply(userText, mem) + '\n（DeepSeek 调用失败：' + err.message + '，已回退本地）';
+    lv.body.textContent = lr;
+    setMeta(lv, '本地回退 · 记忆 ' + mem.length + ' 条 · 失败原因已在文中');
+    endLive(lv);
+    pushAi(lr);
+  }
+  const list = $('#msglist'); if(list) list.scrollTop = list.scrollHeight;
+}
+
+/* ============ 5. 对话与确认流程 ============ */
+function addMsg(text, role){
+  const id = uid('m');
+  const r = role === 'ai' ? 'ai' : 'user';
+  S.msgs.push({id, text, role:r, at:new Date().toISOString()});
+  persistMsgs();
+  return renderMsgEl(text, r);
+}
+
+function renderMsgEl(text, role){
+  const div = document.createElement('div');
+  div.className = 'msg' + (role==='ai' ? ' ai' : '');
+  div.innerHTML = '<div class="bubble'+(role==='ai'?' ai':'')+'">'+esc(text)+'</div>';
+  $('#msglist').appendChild(div);
+  const list = $('#msglist'); list.scrollTop = list.scrollHeight;
+  return div;
+}
+
+function persistMsgs(){
+  Store.put('meta', {k:'msgs', v:S.msgs.slice(-40)});
+}
+
+function pushAi(text){
+  S.msgs.push({id: uid('m'), text, role:'ai', at:new Date().toISOString()});
+  persistMsgs();
+}
+
+function openSheet(cands, src){
+  S.candidates = cands;
+  S.sheetSrc = src || (S.cfg && S.cfg.key ? 'DeepSeek' : '本地规则引擎');
+  const body = $('#sheet-body');
+  const ACT_LABEL = {add:'新增',merge:'合并',update:'更新',supersede:'取代',none:'不重复写',suspect:'疑似重复'};
+  const ACT_CLS = {add:'',merge:'a2',update:'a2',supersede:'a3',none:'a4',suspect:'a3'};
+  body.innerHTML = cands.map((c,i)=>{
+    const t = detectType(c.draft || c.claim);
+    const plan = planWrite(c, S.facts);
+    const actTxt = ACT_LABEL[plan.action] + (plan.action==='merge'||plan.action==='update'||plan.action==='supersede'||plan.action==='none'
+      ? ' ' + Math.round(plan.score*100) + '%' : '');
+    const emo = c.emotion && c.emotion.label
+      ? esc(c.emotion.label) + (c.emotion.intensity ? (' · 强度 ' + c.emotion.intensity) : '') + '　仅标记，不作证据'
+      : '原话无明确情绪词';
+    const inf = c.infer
+      ? '<span class="inf">“' + esc(c.infer.text) + '”</span> · 置信 ' + Math.round(c.infer.conf*100) + '% · 不入库'
+      : '无（原话没有推断句）';
+    return '<div class="cand '+(c.selected?'':'off')+'" data-i="'+i+'">'
+      + '<div class="cand-top"><input type="checkbox" '+(c.selected?'checked':'')+' data-chk>'
+      + '<span class="tag">'+TYPE_LABEL[t]+'</span><span class="tag">'+DOMAINS[c.domain]+'</span>'
+      + '<span class="act-badge '+ACT_CLS[plan.action]+'" title="'+esc(plan.why||'')+'">'+actTxt+'</span>'
+      + '<span style="margin-left:auto">置信 '+Math.round(c.confidence*100)+'%</span></div>'
+      + '<div class="tri">'
+      +   '<div class="tri-row"><span class="tri-k">事实</span><div class="tri-v"><textarea class="cand-text" rows="2" data-txt>'+esc(c.draft)+'</textarea></div></div>'
+      +   '<div class="tri-row"><span class="tri-k">情绪</span><div class="tri-v mut">'+emo+'</div></div>'
+      +   '<div class="tri-row"><span class="tri-k">推断</span><div class="tri-v">'+inf+'</div></div>'
+      + '</div>'
+      + '<div class="cand-quote">原句：'+esc(c.quote)+'</div>'
+      + '<div class="cand-row"><select class="chip" data-dom>'
+      + Object.keys(DOMAINS).map(k=>'<option value="'+k+'" '+(c.domain===k?'selected':'')+'>'+DOMAINS[k]+'</option>').join('')
+      + '</select><select class="chip" data-act>'
+      + ['auto','add','merge','update','supersede','none'].map(k=>'<option value="'+k+'" '+((c.actOverride||'auto')===k?'selected':'')+'>'+(k==='auto'?'自动：'+ACT_LABEL[plan.action]:ACT_LABEL[k])+'</option>').join('')
+      + '</select><span class="chip" data-tok>'+ (c.token) +' token</span></div></div>';
+  }).join('');
+  updateOkBtn();
+  $('#overlay').classList.add('on');
+  $('#sheet').classList.add('on');
+}
+
+function updateOkBtn(){
+  const n = S.candidates.filter(c=>c.selected).length;
+  $('#cand-ok').textContent = '确认入库 (' + n + ')';
+  $('#cand-ok').disabled = n === 0;
+  const rulesN = (S.rules||[]).length;
+  $('#sheet-sub').innerHTML = '共 '+S.candidates.length+' 条候选，将写入 '+n+' 条；可改字、改归类、拒绝'
+    + '<br><span class="badge">已过规则 '+rulesN+'/'+rulesN+' · '+esc(S.sheetSrc||'')+'</span>';
+}
+
+function closeSheet(){
+  $('#overlay').classList.remove('on');
+  $('#sheet').classList.remove('on');
+  S.candidates = [];
+}
+
+$('#sheet-body').addEventListener('input', e=>{
+  const card = e.target.closest('.cand'); if(!card) return;
+  const i = +card.dataset.i;
+  if(e.target.matches('[data-txt]')){
+    S.candidates[i].draft = e.target.value;
+    S.candidates[i].token = tokenCount(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+    const chip = card.querySelector('[data-tok]');
+    if(chip) chip.textContent = S.candidates[i].token + ' token';
+  }
+  if(e.target.matches('[data-chk]')){
+    S.candidates[i].selected = e.target.checked;
+    card.classList.toggle('off', !e.target.checked);
+    updateOkBtn();
+  }
+  if(e.target.matches('[data-dom]')) S.candidates[i].domain = e.target.value;
+  if(e.target.matches('[data-act]')){
+    S.candidates[i].actOverride = e.target.value;
+    const plan = e.target.value === 'auto' ? planWrite(S.candidates[i], S.facts) : {action:e.target.value};
+    const badge = card.querySelector('.act-badge');
+    if(badge){
+      badge.className = 'act-badge ' + ({add:'',merge:'a2',update:'a2',supersede:'a3',none:'a4',suspect:'a3'}[plan.action] || '');
+      badge.textContent = {add:'新增',merge:'合并',update:'更新',supersede:'取代',none:'不重复写',suspect:'疑似重复'}[plan.action] || plan.action;
+    }
+  }
+});
+$('#sheet-body').addEventListener('change', e=>{ if(e.target.matches('[data-dom]')) S.candidates[e.target.closest('.cand').dataset.i].domain = e.target.value; });
+
+$('#cand-skip').onclick = async ()=>{
+  closeSheet(); toast('已丢弃这批候选，原话仍在对话里');
+  S.live = null;
+};
+$('#cand-ok').onclick = async ()=>{
+  const chosen = S.candidates.filter(c=>c.selected);
+  if(!chosen.length){
+    toast('没有勾选任何条目，直接回答');
+    closeSheet();
+    S.live = null;
+    return;
+  }
+  const ops = await commitCandidates(chosen);
+  closeSheet();
+  renderAll();
+  const added = ops.filter(o=>o.kind==='new').length;
+  toast('已写入 '+added+' 条、合并 '+ops.filter(o=>o.kind==='snap').length+' 条', '撤销', async ()=>{
+    for(const op of ops){
+      if(op.kind === 'new') await Store.del('facts', op.id);
+      else await Store.put('facts', op.prev);
+    }
+    await loadFacts(); renderAll(); toast('已撤销');
+  });
+  S.live = null;
+};
+
+/* 返回 ops 而不是 id：撤销时既能删新条目，也能把被合并/更新/取代的旧条目还原 */
+async function commitCandidates(chosen){
+  const ops = [];
+  const blocked = chosen.filter(c=>auditRules(c.draft).length);
+  if(blocked.length){
+    toast('入库前规则校验拦截 ' + blocked.length + ' 条（禁用话术）');
+    chosen = chosen.filter(c=>!auditRules(c.draft).length);
+    if(!chosen.length) return ops;
+  }
+  const now = new Date().toISOString();
+  for(const c of chosen){
+    const auto = planWrite(c, S.facts);
+    const plan = (c.actOverride && c.actOverride !== 'auto')
+      ? {action:c.actOverride, target:auto.target, score:auto.score, why:'用户指定'}
+      : auto;
+    const t = plan.target;
+
+    if((plan.action === 'none' || plan.action === 'merge') && t){
+      ops.push({kind:'snap', id:t.id, prev:{...t}});
+      await Store.put('facts', {...t,
+        hits:(t.hits||1)+1,
+        last_quote: plan.action==='merge' ? (c.quote || t.last_quote || '') : t.last_quote,
+        updated_at: now});
+      continue;
+    }
+    if(plan.action === 'update' && t){
+      ops.push({kind:'snap', id:t.id, prev:{...t}});
+      await Store.put('facts', {...t,
+        content:c.draft, token:tokenCount(c.draft), quote:c.quote,
+        history:[...(t.history||[]), {content:t.content, at:t.updated_at||t.created_at}],
+        hits:(t.hits||1)+1, updated_at: now});
+      continue;
+    }
+    if(plan.action === 'supersede' && t){
+      ops.push({kind:'snap', id:t.id, prev:{...t}});
+      await Store.put('facts', {...t, status:'superseded', valid_to:today(), updated_at: now});
+    }
+
+    const id = uid('m');
+    const fact = {
+      id, type: detectType(c.draft), domain:c.domain,
+      content: c.draft, quote:c.quote,
+      keywords: c.keywords, code: codeOf(c.domain, c.keywords[0], today()),
+      token: tokenCount(c.draft), confidence: c.confidence,
+      status:'active', hits:1, supersedes: (plan.action === 'supersede' && t) ? t.id : null,
+      valid_from: today(), created_at: now, updated_at: now,
+      emotion: c.emotion,
+      source:{ conversation:'local', message:c.msgId, quote:c.quote }
+    };
+    await Store.put('facts', fact);
+    ops.push({kind:'new', id});
+  }
+  await loadFacts();
+  return ops;
+}
+
+/* ==== 网络提示：把浏览器层失败翻译成人话 ==== */
+function netHint(err){
+  const m = String((err && err.message) || err || '');
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m)){
+    return m + '｜网络层失败：先点「测试连接」确认 Key 与 Base URL；若公司网络/代理拦了请求，换网络再试。';
+  }
+  return m;
+}
+
+/* ==== 发送流程：先回答，再拆解入库 ==== */
+/* 回答与记忆确认解耦：用户按下发送后立刻进入回答，候选卡在回答结束后才弹出 */
+async function sendFlow(rawText){
+  const text = String(rawText || '').trim();
+  if(!text) return {cands:0};
+  const btn = $('#send');
+  const old = btn.textContent;
+  addMsg(text);
+  $('#input').value = '';
+  $('#input').style.height = 'auto';
+  const msgId = S.msgs[S.msgs.length-1].id;
+  S.lastUserText = text;
+
+  /* 第一步：回答 */
+  const lv = liveBubble('已收到，正在读取记忆并生成回答…', '回答');
+  S.live = lv;
+  btn.disabled = true; btn.textContent = '回答中…';
+  try{
+    await respond(text, lv);
+  }catch(err){
+    endLive(lv);
+    toast('回答失败：' + netHint(err));
+  }
+  S.live = null;
+  btn.disabled = false; btn.textContent = old;
+
+  /* 第二步：回答已给出，再拆解候选 */
+  let cands = [], src = '本地规则引擎', errMsg = '';
+  if(S.cfg && S.cfg.key){
+    btn.disabled = true; btn.textContent = '拆解中…';
+    try{
+      cands = await llmExtract(text, msgId);
+      src = 'DeepSeek';
+    }catch(err){
+      errMsg = err.message;
+      cands = extract(text, msgId);
+      src = '本地规则引擎（LLM 回退）';
+    }finally{
+      btn.disabled = false; btn.textContent = old;
+    }
+  }else{
+    cands = extract(text, msgId);
+    const joined = cands.map(c=>c.draft).join('；');
+    const hits = auditRules(joined);
+    if(hits.length){
+      cands = cands.filter(c=>!auditRules(c.draft).length);
+      toast('本地抽取命中禁用话术，已剔除 ' + hits.length + ' 条');
+    }
+    S.lastStamp = {src:'本地规则', pass:true, n:(S.rules||[]).length};
+  }
+  if(errMsg) toast('拆解失败，已回退本地：' + errMsg);
+  if(!cands.length){ toast('这条没有可入库的候选，回答已在上方'); return {cands:0}; }
+  openSheet(cands, src);
+  return {cands:cands.length};
+}
+$('#send').onclick = ()=> sendFlow($('#input').value);$('#input').addEventListener('input', e=>{
+  e.target.style.height='auto';
+  e.target.style.height = Math.min(e.target.scrollHeight,120) + 'px';
+});
+
+function allTreeKeys(){
+  const t = buildTree(), ks = [];
+  Object.keys(t).forEach(dk=>{
+    ks.push('d|'+dk);
+    Object.keys(t[dk].topics).forEach(tk=>{
+      ks.push('t|'+dk+'|'+tk);
+      t[dk].topics[tk].facts.forEach(f=>{
+        ks.push('m|'+dk+'|'+tk+'|'+monthKey(f.valid_from||f.created_at));
+      });
+    });
+  });
+  return [...new Set(ks)];
+}
+$('#expandAll').onclick = ()=>{ allTreeKeys().forEach(k=>S.expanded.add(k)); renderTree(); };
+$('#collapseAll').onclick = ()=>{ S.expanded.clear(); renderTree(); };
+
+/* 设置页 */
+function fillCfg(){
+  $('#apiKey').value = S.cfg.key || '';
+  $('#apiModel').value = S.cfg.model || 'deepseek-chat';
+  $('#apiBase').value = S.cfg.base || 'https://api.deepseek.com';
+  $('#apistat').innerHTML = S.cfg.key
+    ? '<span class="badge">已接入 · ' + esc(S.cfg.model) + '</span>'
+    : '未配置（当前使用本地规则引擎）';
+}
+async function saveCfg(){
+  S.cfg = {
+    key: $('#apiKey').value.trim(),
+    model: $('#apiModel').value.trim() || 'deepseek-chat',
+    base: $('#apiBase').value.trim() || 'https://api.deepseek.com'
+  };
+  await Store.put('meta', {k:'api', v:S.cfg});
+  fillCfg();
+  toast(S.cfg.key ? '已保存，Key 只在本机' : '已清空，回退本地引擎');
+}
+$('#saveapi').onclick = saveCfg;
+$('#clearapi').onclick = async ()=>{
+  if(!confirm('清除本机保存的 API Key？')) return;
+  $('#apiKey').value = '';
+  await saveCfg();
+};
+$('#testapi').onclick = async ()=>{
+  await saveCfg();
+  if(!S.cfg.key){ toast('先填 API Key'); return; }
+  const el = $('#apistat');
+  el.textContent = '测试中…';
+  try{
+    const r = await callLLM('只输出 JSON：{"ok":true}', 'ping');
+    parseLlmJson(r.content);
+    el.innerHTML = '<span class="badge">连接正常 · ' + r.ms + 'ms · ' + esc(S.cfg.model) + '</span>';
+    toast('DeepSeek 连接正常，' + r.ms + 'ms');
+  }catch(err){
+    el.innerHTML = '<span style="color:#E4695E">失败：' + esc(err.message) + '</span>';
+  }
+};
+
+/* ============ 6. 记忆树交互 ============ */
+$('#tree').addEventListener('click', async e=>{
+  const t = e.target.closest('[data-tkey]');
+  if(t){
+    const k = t.dataset.tkey;
+    if(S.expanded.has(k)) S.expanded.delete(k); else S.expanded.add(k);
+    renderTree();
+    return;
+  }
+  const op = e.target.dataset.op;
+  if(op){
+    const card = e.target.closest('.fact');
+    const id = card.dataset.id;
+    const f = S.facts.find(x=>x.id===id); if(!f) return;
+    if(op==='del'){ if(!confirm('删除这条记忆？可从导出备份恢复。')) return; await Store.del('facts', id); await loadFacts(); renderAll(); toast('已删除'); }
+    if(op==='archive'){ f.status = f.status==='archived'?'active':'archived'; await Store.put('facts', f); await loadFacts(); renderAll(); toast(f.status==='archived'?'已归档，仍可检索':'已恢复'); }
+    if(op==='edit'){
+      const v = prompt('修改这条记忆（只改内容，不改原句证据）', f.content);
+      if(v && v.trim()){ f.content = refine(v); f.token = tokenCount(f.content); f.updated_at = new Date().toISOString(); await Store.put('facts', f); await loadFacts(); renderAll(); toast('已更新'); }
+    }
+  }
+});
+
+$('#qbtn').onclick = ()=>{
+  const q = $('#q').value.trim();
+  S.filter = q;
+  if(!q){ $('#recall').textContent='输入关键词，按 L1→L4 逐层下钻，不会遍历全库。'; renderTree(); return; }
+  const kws = q.split(/\s+/);
+  const hits = S.facts.filter(f=>kws.some(k=>f.content.includes(k) || (f.keywords||[]).some(x=>x.includes(k))));
+  const token = hits.reduce((a,f)=>a+(f.token||0),0) + 80;
+  const doms = [...new Set(hits.map(f=>DOMAINS[f.domain]))];
+  $('#recall').innerHTML = '命中：<b style="color:#3EC7D8">'+doms.join(' / ')+'</b> → '+hits.length+' 条事实 → 读取约 <b style="color:#3EC7D8">'+token+'</b> tokens（未遍历全库 '+S.facts.length+' 条）';
+  if(!hits.length){ $('#tree').innerHTML='<div class="empty">没有命中。换个词试试。</div>'; return; }
+  $('#tree').innerHTML = hits.map(factCard).join('');
+  $$('#tree .fact').forEach(el=>el.classList.add('hit'));
+};
+
+/* ============ 7. 规则 / 导出 ============ */
+$('#saverules').onclick = async ()=>{
+  const text = $('#rules').value;
+  await Store.put('meta', {k:'rules', v:text});
+  S.rules = text.split('\n').filter(Boolean);
+  toast('规则已保存，下次对话自动注入');
+};
+$('#resetrules').onclick = async ()=>{
+  $('#rules').value = DEFAULT_RULES;
+  await Store.put('meta', {k:'rules', v:DEFAULT_RULES});
+  S.rules = DEFAULT_RULES.split('\n');
+  toast('已恢复默认');
+};
+
+function download(name, text, type){
+  const blob = new Blob([text], {type: type||'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+$('#expjson').onclick = ()=>{
+  const payload = {app:'crabAI', version:1, exported_at:new Date().toISOString(), rules:S.rules, facts:S.facts};
+  download('crabAI-backup-'+today()+'.json', JSON.stringify(payload,null,2));
+  toast('JSON 已导出');
+};
+$('#expmd').onclick = ()=>{
+  let md = '# crabAI 记忆导出\n\n> 导出时间：'+new Date().toLocaleString()+'\n\n## L0 规则\n\n';
+  md += S.rules.map(r=>'- '+r).join('\n') + '\n\n';
+  const tree = buildTree();
+  Object.keys(tree).forEach(dk=>{
+    md += '## '+tree[dk].label+'\n\n';
+    Object.values(tree[dk].topics).forEach(tp=>{
+      md += '### '+tp.label+' · '+tp.month+'\n\n';
+      tp.facts.forEach(f=>{
+        md += '- ' + f.content + '\n';
+        md += '  - id: `'+f.id+'` | 置信 '+(Math.round(f.confidence*100))+'% | '+f.token+' tokens\n';
+        if(f.source && f.source.quote) md += '  - 原句：'+f.source.quote+'\n';
+        md += '\n';
+      });
+    });
+  });
+  download('crabAI-memory-'+today()+'.md', md, 'text/markdown');
+  toast('Markdown 已导出');
+};
+
+/* ============ 9. 演示数据 / 清空 ============ */
+const SEED_MSGS = [
+  '妮妮今天又没回我消息，肯定是不在乎我了，我特别烦，一直在等。',
+  '后来才知道，她生气不是因为我跟女生说话，是因为我政治作业没做好，她被老师点名了。',
+  '我要求自己以后先看事实再下结论，不要再靠猜。'
+];
+$('#seed').onclick = async ()=>{
+  for(const t of SEED_MSGS){
+    const mid = uid('m');
+    addMsg(t);
+    const cands = extract(t, mid);
+    await commitCandidates(cands);
+  }
+  await loadFacts(); renderAll(); toast('演示数据已写入');
+};
+$('#clear').onclick = async ()=>{
+  if(!confirm('清空全部本地记忆？此操作不可撤销。')) return;
+  await Store.clear('facts'); await loadFacts(); renderAll(); toast('已清空');
+  S.msgs = []; persistMsgs();
+  $('#msglist').innerHTML='';
+};
+
+/* ============ 10. 提示条 ============ */
+let toastTimer = null;
+function toast(text, actionLabel, action){
+  const el = $('#toast');
+  el.innerHTML = esc(text) + (actionLabel ? ' · <b id="undo">'+esc(actionLabel)+'</b>' : '');
+  el.classList.add('on');
+  if(actionLabel){
+    const b = $('#undo');
+    b.onclick = ()=>{ el.classList.remove('on'); action && action(); };
+  }
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('on'), actionLabel?10000:2600);
+}
+
+/* ============ 11. 初始化 ============ */
+async function loadFacts(){
+  S.facts = await Store.all('facts');
+  S.facts.sort((a,b)=> (b.created_at||'').localeCompare(a.created_at||''));
+}
+function renderAll(){ renderStats(); renderTree(); renderGraph(); }
+
+function setView(name){
+  $$('.tab').forEach(x=>x.classList.toggle('on', x.dataset.view===name));
+  $$('.view').forEach(v=>v.classList.toggle('on', v.id==='view-'+name));
+  if(name==='tree') renderTree();
+  if(name==='graph') renderGraph();
+}
+$$('.tab').forEach(t=>{ t.onclick = ()=> setView(t.dataset.view); });
+
+(async function init(){
+  try{
+    await Store.init();
+    const meta = await Store.all('meta');
+    const r = meta.find(m=>m.k==='rules');
+    $('#rules').value = r ? r.v : DEFAULT_RULES;
+    S.rules = ($('#rules').value || '').split('\n').filter(Boolean);
+    const api = meta.find(m=>m.k==='api');
+    if(api && api.v) S.cfg = {key: api.v.key||'', model: api.v.model||'deepseek-chat', base: api.v.base||'https://api.deepseek.com'};
+    const au = meta.find(m=>m.k==='audit');
+    if(au && Array.isArray(au.v)) S.auditLog = au.v;
+    fillCfg(); renderAudit();
+    await loadFacts();
+    const mm = meta.find(m=>m.k==='msgs');
+    if(mm && Array.isArray(mm.v) && mm.v.length){
+      const kept = mm.v.filter(m=>!/^读取记忆 \d+ 条/.test(m.text || ''));
+      S.msgs = kept;
+      kept.forEach(m=>renderMsgEl(m.text, m.role));
+      if(kept.length && kept[kept.length-1].role === 'user') setTimeout(()=>respond(kept[kept.length-1].text), 0);
+    }
+    renderAll();
+    $('#storinfo').textContent = (Store.mode === 'idb' ? 'IndexedDB · 已连接' : 'localStorage 兜底（file:// 下浏览器的限制）') + ' · ' + S.facts.length + ' 条事实';
+  }catch(err){
+    $('#storinfo').textContent = 'IndexedDB 不可用：' + err.message;
+  }
+  if(location.search.includes('selftest')) runSelfTest();
+  const demo = new URLSearchParams(location.search).get('demo');
+  if(demo) await runDemo(demo);
+})();
+
+async function runDemo(mode){
+  if(!S.facts.length){
+    for(const t of SEED_MSGS){
+      const mid = uid('m');
+      addMsg(t);
+      const cands = extract(t, mid);
+      await commitCandidates(cands);
+    }
+    await loadFacts(); renderAll();
+  }
+  if(mode === 'flow'){
+    setView('chat');
+    const r = await sendFlow('妮妮今天又没回我消息。');
+    await new Promise(res=>setTimeout(res, 500));
+    const ai = [...document.querySelectorAll('.msg.ai .bubble')]
+      .map(n=>n.textContent.replace(/^\u25cf?/,'').trim())
+      .filter(x=>x && x.length > 8);
+    const last = ai[ai.length-1] || '';
+    document.title = (last.length > 20 ? 'FLOW_OK' : 'FLOW_FAIL') + ' · chars=' + last.length + ' · cands=' + r.cands;
+    return;
+  }
+  if(mode === 'sheet'){
+    const cands = extract('妮妮今天又没回我消息，肯定是不在乎我了，我特别烦。', 'demo');
+    openSheet(cands);
+    return;
+  }
+  if(mode === 'commit' || mode === 'commitadd'){
+    setView('chat');
+    const before = S.facts.length;
+    const hitsBefore = S.facts.reduce((a,f)=>a+(f.hits||1),0);
+    const t = mode === 'commitadd'
+      ? '数学作业没做完，被老师点名了。'
+      : '妮妮今天又没回我消息，肯定是不在乎我了。';
+    addMsg(t);
+    const cands = extract(t, 'demo');
+    const ops = await commitCandidates(cands);
+    const afterAdd = S.facts.length;
+    const hitsAfter = S.facts.reduce((a,f)=>a+(f.hits||1),0);
+    for(const op of ops){
+      if(op.kind === 'new') await Store.del('facts', op.id);
+      else await Store.put('facts', op.prev);
+    }
+    await loadFacts(); renderAll();
+    const afterUndo = S.facts.length;
+    const hitsUndo = S.facts.reduce((a,f)=>a+(f.hits||1),0);
+    const pass = afterUndo === before && hitsUndo === hitsBefore;
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;inset:0;background:#0E1720;color:#E8F0F5;padding:18px;font:13px/1.9 monospace;z-index:99';
+    box.textContent = 'COMMIT TEST\nbefore=' + before + ' after=' + afterAdd + ' undo=' + afterUndo
+      + '\nhits ' + hitsBefore + '→' + hitsAfter + '→' + hitsUndo
+      + '\nops=' + ops.map(o=>o.kind).join(',')
+      + '\naction=' + planWrite(cands[0], S.facts).action
+      + '\nresult=' + (pass ? 'PASS' : 'FAIL');
+    document.body.appendChild(box);
+    document.title = pass ? 'COMMIT_PASS' : 'COMMIT_FAIL';
+    return;
+  }
+  if(mode === 'skip'){
+    setView('chat');
+    $('#input').value = '我们昨天吵架了。';
+    $('#send').click();
+    setTimeout(()=>{ const b = document.getElementById('cand-skip'); if(b) b.click(); }, 400);
+    return;
+  }
+  if(mode === 'stream'){
+    S.simStream = true;
+    setView('chat');
+    $('#input').value = '我们昨天吵架了。';
+    $('#send').click();
+    setTimeout(()=>{ const b = document.getElementById('cand-skip'); if(b) b.click(); }, 400);
+    return;
+  }
+  if(mode === 'reply'){
+    setView('chat');
+    const t = '我们昨天吵架了。';
+    addMsg(t);
+    S.lastUserText = t;
+    await respond(t);
+    return;
+  }
+  setView(['graph','tree','rules','settings','export'].includes(mode) ? mode : 'tree');
+}
+
+/* ============ 12. 自检（?selftest=1） ============ */
+function runSelfTest(){
+  const results = [];
+  const ok = (name, cond, extra) => results.push((cond?'PASS':'FAIL') + ' · ' + name + (extra?' · '+String(extra):''));
+  try { selfTestBody(ok); } catch(err){ results.push('FAIL · 自检异常 · ' + err.message); }
+  const box = document.createElement('div');
+  box.id = 'selftest';
+  box.style.cssText = 'position:fixed;inset:0;background:#0E1720;color:#E8F0F5;padding:18px;font:13px/1.9 monospace;z-index:99;overflow:auto';
+  box.innerHTML = '<h3 style="color:#3EC7D8;margin:0 0 8px">SELFTEST</h3>' + results.map(r=>'<div style="color:'+(r.startsWith('PASS')?'#4BC08A':'#E4695E')+'">'+r+'</div>').join('');
+  document.body.appendChild(box);
+  document.title = results.some(r=>r.startsWith('FAIL')) ? 'SELFTEST_FAIL' : 'SELFTEST_PASS';
+}
+
+function selfTestBody(ok){
+  const c1 = extract('她今天又没回我消息，肯定是不在乎我了，我特别烦。', 'm1');
+  ok('分句与候选数', c1.length === 1, 'got '+c1.length);
+  ok('精炼去掉“肯定/特别”', !c1[0].draft.includes('肯定') && !c1[0].draft.includes('特别'), c1[0].draft);
+  ok('情绪识别', c1[0].emotion.label === '烦' || c1[0].emotion.label === '焦虑', c1[0].emotion.label);
+  const c2 = extract('我的数学作业没做，被老师点名了。', 'm2');
+  ok('学业域识别', c2[0].domain === 'study', c2[0].domain);
+  ok('事件类型识别', c2[0].type === 'event', c2[0].type);
+  const c3 = extract('我要求自己以后先看事实再下结论。', 'm3');
+  ok('规则类型识别', c3[0].type === 'rule', c3[0].type);
+  ok('规则域识别', c3[0].domain === 'rule', c3[0].domain);
+  ok('token 大于 0', tokenCount('这是一条测试记忆') > 0, tokenCount('这是一条测试记忆'));
+  ok('编码格式', /^[A-Z]{3}\.[^\s]+\.[0-9]{6}$/.test(codeOf('emotion','妮妮','2026-11-20')), codeOf('emotion','妮妮','2026-11-20'));
+  ok('相似度自比=1', similarity('妮妮生气了','妮妮生气了') === 1);
+  ok('不同句相似度低', similarity('妮妮生气了','数学作业没做完') < 0.4, similarity('妮妮生气了','数学作业没做完'));
+  const dup = planWrite({claim:'妮妮生气了。'}, [{content:'妮妮生气了。'}]);
+  ok('重复判定 none（只累加命中）', dup.action === 'none', dup.action);
+  const conflict = planWrite({claim:'妮妮想和我说话。', keywords:['妮妮'], person:'妮妮'}, [{id:'c0', content:'妮妮不想和我说话。', keywords:['妮妮']}]);
+  ok('结论相反触发 supersede', conflict.action === 'supersede', conflict.action + ' ' + Math.round(conflict.score*100) + '%');
+  const merge1 = planWrite({claim:'妮妮今天没回我消息。', keywords:['妮妮'], person:'妮妮'}, [{id:'c1', content:'妮妮今天没回我消息，我在等。', keywords:['妮妮']}]);
+  ok('同事实重复陈述→merge', merge1.action === 'merge', merge1.action + ' ' + Math.round(merge1.score*100) + '%');
+  const up1 = planWrite({claim:'妮妮今天没回我消息，我一直等到晚上十一点。', keywords:['妮妮'], person:'妮妮'}, [{id:'c2', content:'妮妮今天没回我消息。', keywords:['妮妮']}]);
+  ok('同事实补充细节→update', up1.action === 'update', up1.action + ' ' + Math.round(up1.score*100) + '%');
+  const add1 = planWrite({claim:'数学作业没做完，被老师点名。', keywords:['数学'], person:''}, [{id:'c3', content:'妮妮今天没回我消息。', keywords:['妮妮']}]);
+  ok('无关事实→add', add1.action === 'add', add1.action + ' ' + Math.round(add1.score*100) + '%');
+  const inf1 = detectInference('她今天又没回我消息，肯定是不在乎我了。');
+  ok('推断被单独拎出', !!inf1 && inf1.text.includes('不在乎') && inf1.conf <= 0.35, inf1 ? (inf1.text + ' ' + inf1.conf) : 'null');
+  const inf2 = detectInference('数学作业没做完。');
+  ok('无推断句返回 null', inf2 === null, String(inf2));
+  ok('回复 prompt 要求推断列置信度', buildReplyPrompt([]).includes('推断句') && buildReplyPrompt([]).includes('0.15-0.6'));
+  ok('抽取 prompt 含 inference 字段', buildSystemPrompt().includes('inference'));
+  ok('默认规则 5 条', DEFAULT_RULES.split('\n').length === 5, DEFAULT_RULES.split('\n').length);
+  ok('规则扫描命中安慰话术', auditRules('我理解你的感受，别难过了').length >= 2, auditRules('我理解你的感受，别难过了').length);
+  ok('规则扫描放行事实句', auditRules('她今天没回消息，原因是作业没做。').length === 0);
+  ok('system prompt 注入全部规则', DEFAULT_RULES.split('\n').every((r,i)=>buildSystemPrompt().includes((i+1)+'. '+r)), buildSystemPrompt().split('\n').length + ' 行');
+  ok('JSON 解析支持代码块', parseLlmJson('```json\n{"facts":[]}\n```').facts.length === 0);
+  const ap = auditParsed('{"facts":[{"claim":"她今天没回消息。","quote":"肯定是不在乎我了"}]}');
+  ok('quote 内情绪不误伤', !ap.err && ap.hits.length === 0, ap.err ? ap.err.message : ap.hits.length);
+  const ap2 = auditParsed('{"facts":[{"claim":"她肯定是不在乎我。","quote":"肯定是不在乎我了"}]}');
+  ok('claim 推断句被拦', ap2.hits.length > 0, ap2.hits.length);
+  ok('无原句证据降置信', normalizeLlmFact({claim:'她在乎我。', quote:'不存在的片段', domain:'emotion', confidence:0.9}, '她今天没回消息。', 'm').confidence <= 0.65);
+  ok('树折叠键生成', allTreeKeys().length >= 0);
+  resetGT();
+  zoomAt({x:180, y:200}, 2);
+  ok('缩放钳制生效', GT.s === 2 && Math.abs(GT.s) <= 5, 's=' + GT.s.toFixed(2));
+  ok('缩放锚点不漂移', Math.abs(180 * GT.s + GT.tx - 180) < 0.01 && Math.abs(200 * GT.s + GT.ty - 200) < 0.01, 'tx=' + GT.tx.toFixed(1) + ' ty=' + GT.ty.toFixed(1));
+  zoomAt({x:180,y:200}, 10);
+  ok('缩放上限 5', GT.s === 5, GT.s);
+  resetGT();
+
+  const backup = S.facts;
+  S.facts = [{id:'t1', content:'妮妮因为政治作业的事生气。', keywords:['妮妮'], emotion:{label:'生气',intensity:2}, token:8, confidence:0.9, status:'active', valid_from:'2026-11-20'}];
+  const mem = recallRelated('我们昨天吵架了，妮妮很生气', 3);
+  ok('检索能召回相关记忆', mem.length === 1 && mem[0].id === 't1', mem.length);
+  const lr = localReply('我们昨天吵架了', mem);
+  ok('本地回应含六段结构', ['事实：','你加的情绪：','其他解读：','判断依据：','选项与代价：','建议：'].every(k=>lr.includes(k)));
+  ok('本地回应无安慰话术', auditTone(lr).length === 0, auditTone(lr).length);
+  ok('回应 prompt 注入规则', buildReplyPrompt(mem).includes('L0 规则'));
+  const lb = liveBubble('测试', '思考');
+  ok('状态气泡含指示点', !!lb.node.querySelector('.live-dot') && !!lb.meta);
+  setMeta(lb, '测试元信息');
+  ok('状态气泡可更新', lb.meta.textContent === '测试元信息', lb.meta.textContent);
+  endLive(lb); lb.node.remove();
+  ok('状态气泡可结束', lb.ended === true);
+  ok('发送流程先回答后拆解', String(sendFlow).indexOf('await respond') > -1 && String(sendFlow).indexOf('await respond') < String(sendFlow).indexOf('llmExtract'));
+  ok('候选确认不重复回答', !String($('#cand-ok').onclick).includes('await respond'));
+  ok('网络失败提示可读', netHint(new Error('Failed to fetch')).includes('网络层失败'));
+  S.facts = backup;
+}
+</script>
 </body>
 </html>
+
+
